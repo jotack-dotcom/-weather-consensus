@@ -9,54 +9,87 @@ type ModelResult = {
   windGusts: number;
 };
 
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+
     const city = searchParams.get("city");
+    const latitudeParameter = searchParams.get("latitude");
+    const longitudeParameter = searchParams.get("longitude");
 
-    if (!city) {
-      return NextResponse.json(
-        { error: "City is required" },
-        { status: 400 }
-      );
-    }
+    let latitude: number;
+    let longitude: number;
+    let locationName: string;
+    let country = "";
 
-    // --------------------------------------------------
-    // 1. Find city coordinates
-    // --------------------------------------------------
+    const hasCoordinates =
+      latitudeParameter !== null && longitudeParameter !== null;
 
-    const geocodingResponse = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-        city
-      )}&count=1&language=en&format=json`,
-      {
-        cache: "no-store",
+    if (hasCoordinates) {
+      latitude = Number(latitudeParameter);
+      longitude = Number(longitudeParameter);
+
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        return NextResponse.json(
+          { error: "Invalid location coordinates." },
+          { status: 400 }
+        );
       }
-    );
 
-    if (!geocodingResponse.ok) {
-      throw new Error("Could not find location");
-    }
+      locationName = "Your location";
+    } else {
+      if (!city) {
+        return NextResponse.json(
+          { error: "City is required." },
+          { status: 400 }
+        );
+      }
 
-    const geocodingData = await geocodingResponse.json();
-
-    if (!geocodingData.results?.length) {
-      return NextResponse.json(
-        { error: `Could not find "${city}"` },
-        { status: 404 }
+      const geocodingResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+          city
+        )}&count=1&language=en&format=json`,
+        { cache: "no-store" }
       );
+
+      if (!geocodingResponse.ok) {
+        throw new Error("Could not find location.");
+      }
+
+      const geocodingData = await geocodingResponse.json();
+
+      if (!geocodingData.results?.length) {
+        return NextResponse.json(
+          { error: `Could not find "${city}".` },
+          { status: 404 }
+        );
+      }
+
+      const location = geocodingData.results[0];
+
+      latitude = location.latitude;
+      longitude = location.longitude;
+      locationName = location.name;
+      country = location.country ?? "";
     }
 
-    const location = geocodingData.results[0];
-
-    const latitude = location.latitude;
-    const longitude = location.longitude;
-
-    // --------------------------------------------------
-    // 2. Current weather
-    // --------------------------------------------------
-
-    const currentUrl =
+    const weatherUrl =
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
       `&longitude=${longitude}` +
       `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m` +
@@ -65,153 +98,87 @@ export async function GET(request: Request) {
       `&wind_speed_unit=ms` +
       `&timezone=auto`;
 
-    const currentResponse = await fetch(currentUrl, {
+    const weatherResponse = await fetch(weatherUrl, {
       cache: "no-store",
     });
 
-    if (!currentResponse.ok) {
-      throw new Error("Could not fetch current weather");
+    if (!weatherResponse.ok) {
+      throw new Error("Could not fetch weather.");
     }
 
-    const currentData = await currentResponse.json();
+    const weatherData = await weatherResponse.json();
 
-    // --------------------------------------------------
-    // 3. Weather models
-    // --------------------------------------------------
-
-    const modelNames = [
-      {
-        name: "ECMWF",
-        model: "ecmwf_ifs025",
-      },
-      {
-        name: "NOAA",
-        model: "gfs_seamless",
-      },
-      {
-        name: "DWD",
-        model: "icon_seamless",
-      },
+    const modelInformation = [
+      { name: "ECMWF", model: "ecmwf_ifs025" },
+      { name: "NOAA", model: "gfs_seamless" },
+      { name: "DWD", model: "icon_seamless" },
     ];
 
-    const modelRequests = modelNames.map(async (modelInfo) => {
-      const url =
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
-        `&longitude=${longitude}` +
-        `&models=${modelInfo.model}` +
-        `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m` +
-        `&wind_speed_unit=ms` +
-        `&timezone=auto`;
+    const models = await Promise.all(
+      modelInformation.map(async (modelInformation) => {
+        const modelUrl =
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
+          `&longitude=${longitude}` +
+          `&models=${modelInformation.model}` +
+          `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m` +
+          `&wind_speed_unit=ms` +
+          `&timezone=auto`;
 
-      const response = await fetch(url, {
-        cache: "no-store",
-      });
+        const modelResponse = await fetch(modelUrl, {
+          cache: "no-store",
+        });
 
-      if (!response.ok) {
-        throw new Error(`Could not fetch ${modelInfo.name}`);
-      }
+        if (!modelResponse.ok) {
+          throw new Error(
+            `Could not fetch the ${modelInformation.name} model.`
+          );
+        }
 
-      const data = await response.json();
+        const modelData = await modelResponse.json();
 
-      return {
-        name: modelInfo.name,
-        temperature: data.current.temperature_2m,
-        precipitationProbability:
-          data.current.precipitation_probability,
-        precipitation: data.current.precipitation,
-        windSpeed: data.current.wind_speed_10m,
-        windGusts: data.current.wind_gusts_10m,
-      } satisfies ModelResult;
-    });
-
-    const models = await Promise.all(modelRequests);
-
-    // --------------------------------------------------
-    // 4. Median calculation
-    // --------------------------------------------------
-
-    function median(values: number[]) {
-      const sorted = [...values].sort((a, b) => a - b);
-
-      const middle = Math.floor(sorted.length / 2);
-
-      if (sorted.length % 2 === 0) {
-        return (sorted[middle - 1] + sorted[middle]) / 2;
-      }
-
-      return sorted[middle];
-    }
+        return {
+          name: modelInformation.name,
+          temperature: modelData.current.temperature_2m,
+          precipitationProbability:
+            modelData.current.precipitation_probability,
+          precipitation: modelData.current.precipitation,
+          windSpeed: modelData.current.wind_speed_10m,
+          windGusts: modelData.current.wind_gusts_10m,
+        } satisfies ModelResult;
+      })
+    );
 
     const consensus = {
-      temperature: median(
-        models.map((model) => model.temperature)
-      ),
-
+      temperature: median(models.map((model) => model.temperature)),
       precipitationProbability: median(
-        models.map(
-          (model) => model.precipitationProbability
-        )
+        models.map((model) => model.precipitationProbability)
       ),
-
-      precipitation: median(
-        models.map((model) => model.precipitation)
-      ),
-
-      windSpeed: median(
-        models.map((model) => model.windSpeed)
-      ),
-
-      windGusts: median(
-        models.map((model) => model.windGusts)
-      ),
+      precipitation: median(models.map((model) => model.precipitation)),
+      windSpeed: median(models.map((model) => model.windSpeed)),
+      windGusts: median(models.map((model) => model.windGusts)),
     };
 
-    // --------------------------------------------------
-    // 5. Return everything to the website
-    // --------------------------------------------------
-
     return NextResponse.json({
-      city: location.name,
-      country: location.country,
-
+      city: locationName,
+      country,
       latitude,
       longitude,
-
-      temperature:
-        currentData.current.temperature_2m,
-
-      precipitation:
-        currentData.current.precipitation,
-
+      temperature: weatherData.current.temperature_2m,
+      precipitation: weatherData.current.precipitation,
       precipitationProbability:
-        currentData.current.precipitation_probability,
-
-      windSpeed:
-        currentData.current.wind_speed_10m,
-
-      windGusts:
-        currentData.current.wind_gusts_10m,
-
-      windDirection:
-        currentData.current.wind_direction_10m,
-
-      time:
-        currentData.current.time,
-
-      forecast:
-        currentData.daily,
-
+        weatherData.current.precipitation_probability,
+      windSpeed: weatherData.current.wind_speed_10m,
+      windGusts: weatherData.current.wind_gusts_10m,
+      windDirection: weatherData.current.wind_direction_10m,
+      forecast: weatherData.daily,
       models,
-
       consensus,
     });
   } catch (error) {
     console.error(error);
 
     return NextResponse.json(
-      {
-        error: "Something went wrong while fetching weather data.",
-      },
+      { error: "Something went wrong while fetching weather data." },
       { status: 500 }
     );
   }

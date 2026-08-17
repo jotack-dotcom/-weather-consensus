@@ -22,14 +22,6 @@ type ModelResult = {
   windGusts: number;
 };
 
-type Consensus = {
-  temperature: number;
-  precipitationProbability: number;
-  precipitation: number;
-  windSpeed: number;
-  windGusts: number;
-};
-
 type Weather = {
   city: string;
   country: string;
@@ -41,25 +33,9 @@ type Weather = {
   windDirection: number;
   forecast: Forecast;
   models: ModelResult[];
-  consensus: Consensus;
+  consensus: Omit<ModelResult, "name">;
   error?: string;
 };
-
-function AdPlaceholder({ location }: { location: string }) {
-  return (
-    <div className="my-8 flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-6 text-center">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Advertisement
-        </p>
-
-        <p className="mt-2 text-sm text-slate-400">
-          Ad space — {location}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function windDirectionToText(degrees: number) {
   const directions = [
@@ -83,29 +59,20 @@ function weatherDescription(code: number | undefined) {
     2: "Partly cloudy",
     3: "Overcast",
     45: "Fog",
-    48: "Rime fog",
+    48: "Fog",
     51: "Light drizzle",
     53: "Drizzle",
     55: "Heavy drizzle",
-    56: "Freezing drizzle",
-    57: "Freezing drizzle",
     61: "Light rain",
     63: "Rain",
     65: "Heavy rain",
-    66: "Freezing rain",
-    67: "Freezing rain",
     71: "Light snow",
     73: "Snow",
     75: "Heavy snow",
-    77: "Snow grains",
     80: "Rain showers",
     81: "Rain showers",
     82: "Heavy rain showers",
-    85: "Snow showers",
-    86: "Heavy snow showers",
     95: "Thunderstorm",
-    96: "Thunderstorm with hail",
-    99: "Thunderstorm with hail",
   };
 
   return descriptions[code ?? -1] ?? "Weather forecast";
@@ -126,16 +93,16 @@ function weatherIcon(code: number | undefined) {
 
   return "🌤️";
 }
-function getConfidence(models: ModelResult[]) {
-  if (models.length < 2) {
-    return {
-      label: "Unavailable",
-      description: "Not enough weather models are available.",
-      color: "text-slate-300",
-      background: "bg-slate-800",
-    };
-  }
 
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function getConfidence(models: ModelResult[]) {
   const temperatures = models.map((model) => model.temperature);
   const rainChances = models.map(
     (model) => model.precipitationProbability
@@ -185,35 +152,38 @@ function getConfidence(models: ModelResult[]) {
   };
 }
 
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(`${date}T12:00:00`));
+function AdPlaceholder({ location }: { location: string }) {
+  return (
+    <div className="my-8 flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-6 text-center">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          Advertisement
+        </p>
+        <p className="mt-2 text-sm text-slate-400">
+          Ad space — {location}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
   const [searchCity, setSearchCity] = useState("Stockholm");
   const [weather, setWeather] = useState<Weather | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
 
-  async function loadWeather(city: string) {
-    const cleanCity = city.trim();
-
-    if (!cleanCity) {
-      return;
-    }
-
+  async function loadWeather(
+    parameters: URLSearchParams,
+    fromLocation = false
+  ) {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(
-        `/api/weather?city=${encodeURIComponent(cleanCity)}`
-      );
-
+      const response = await fetch(`/api/weather?${parameters.toString()}`);
       const data: Weather = await response.json();
 
       if (!response.ok) {
@@ -221,25 +191,67 @@ export default function Home() {
       }
 
       setWeather(data);
-      setSearchCity(cleanCity);
     } catch (err) {
-      setWeather(null);
-
       setError(
         err instanceof Error ? err.message : "Could not load weather data."
       );
     } finally {
       setLoading(false);
+
+      if (fromLocation) {
+        setLocating(false);
+      }
     }
   }
 
   useEffect(() => {
-    loadWeather("Stockholm");
+    void loadWeather(new URLSearchParams({ city: "Stockholm" }));
   }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    loadWeather(searchCity);
+
+    const city = searchCity.trim();
+
+    if (city) {
+      setLocationMessage("");
+      void loadWeather(new URLSearchParams({ city }));
+    }
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setLocationMessage(
+        "Your browser does not support location. Please search for a city."
+      );
+      return;
+    }
+
+    setLocating(true);
+    setLocationMessage("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const parameters = new URLSearchParams({
+          latitude: position.coords.latitude.toString(),
+          longitude: position.coords.longitude.toString(),
+        });
+
+        setLocationMessage("Showing weather for your current location.");
+        void loadWeather(parameters, true);
+      },
+      () => {
+        setLocating(false);
+        setLocationMessage(
+          "Location was not shared. Stockholm is still available as the default."
+        );
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 300000,
+      }
+    );
   }
 
   const daily =
@@ -254,28 +266,30 @@ export default function Home() {
       windSpeedMax: weather.forecast.wind_speed_10m_max[index],
       windGustsMax: weather.forecast.wind_gusts_10m_max[index],
     })) ?? [];
-    const confidence = weather ? getConfidence(weather.models) : null;
+
+  const confidence = weather ? getConfidence(weather.models) : null;
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="mb-10">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
-  HowHot.today
-</p>
+            HowHot.today
+          </p>
 
-<h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-  Today&apos;s weather, with more confidence.
-</h1>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            Today&apos;s weather, with more confidence.
+          </h1>
 
-<p className="mt-3 max-w-2xl text-slate-300">
-  Compare multiple weather models to get a clearer forecast for your day.
-</p>
+          <p className="mt-3 max-w-2xl text-slate-300">
+            Compare multiple weather models to get a clearer forecast for your
+            day.
+          </p>
         </header>
 
         <form
           onSubmit={handleSubmit}
-          className="mb-8 flex flex-col gap-3 sm:flex-row"
+          className="flex flex-col gap-3 sm:flex-row"
         >
           <input
             value={searchCity}
@@ -289,12 +303,24 @@ export default function Home() {
             disabled={loading}
             className="rounded-xl bg-sky-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Loading..." : "Search"}
+            Search
           </button>
         </form>
-        <AdPlaceholder location="Below city search" />
 
-      
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={locating}
+          className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        >
+          {locating ? "Getting your location..." : "Use my location"}
+        </button>
+
+        {locationMessage && (
+          <p className="mt-3 text-sm text-slate-400">{locationMessage}</p>
+        )}
+
+        <AdPlaceholder location="Below city search" />
 
         {error && (
           <div className="mb-8 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
@@ -314,14 +340,14 @@ export default function Home() {
               <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
                 <div>
                   <p className="text-sm text-sky-400">Current weather</p>
-
                   <h2 className="text-3xl font-bold">{weather.city}</h2>
-
-                  <p className="text-slate-400">{weather.country}</p>
+                  {weather.country && (
+                    <p className="text-slate-400">{weather.country}</p>
+                  )}
                 </div>
 
                 <p className="text-sm text-slate-400">
-                  Current values from Open-Meteo
+                  Consensus from available weather models
                 </p>
               </div>
 
@@ -367,13 +393,10 @@ export default function Home() {
             </section>
 
             <section className="mb-8">
-              <div className="mb-4">
-                <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
-                  7-day forecast
-                </p>
-
-                <h2 className="text-2xl font-bold">Coming days</h2>
-              </div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+                7-day forecast
+              </p>
+              <h2 className="mb-4 text-2xl font-bold">Coming days</h2>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                 {daily.map((day, index) => (
@@ -385,13 +408,10 @@ export default function Home() {
                       {index === 0 ? "Today" : formatDate(day.date)}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">{day.date}</p>
-
                     <div className="mt-4 flex min-h-12 items-center gap-2 text-sm text-slate-400">
                       <span className="text-3xl" aria-hidden="true">
                         {weatherIcon(day.weatherCode)}
                       </span>
-
                       <span>{weatherDescription(day.weatherCode)}</span>
                     </div>
 
@@ -403,9 +423,7 @@ export default function Home() {
                     </p>
 
                     <div className="mt-4 space-y-1 text-sm text-slate-300">
-                      <p>
-                        Rain: {day.precipitationProbability.toFixed(0)}%
-                      </p>
+                      <p>Rain: {day.precipitationProbability.toFixed(0)}%</p>
                       <p>{day.precipitationSum.toFixed(1)} mm</p>
                       <p>Wind: {day.windSpeedMax.toFixed(1)} m/s</p>
                       <p>Gusts: {day.windGustsMax.toFixed(1)} m/s</p>
@@ -418,137 +436,72 @@ export default function Home() {
             <AdPlaceholder location="Below 7-day forecast" />
 
             <section>
-              <div className="mb-4">
-                <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
-                  Model comparison
-                </p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+                Model comparison
+              </p>
+              <h2 className="text-2xl font-bold">Weather Consensus</h2>
 
-                <h2 className="text-2xl font-bold">Weather Consensus</h2>
-                {confidence && (
-  <div
-    className={`mt-4 rounded-xl border border-white/10 p-4 ${confidence.background}`}
-  >
-    <p className="text-sm text-slate-400">Forecast confidence</p>
+              {confidence && (
+                <div
+                  className={`mt-4 rounded-xl border border-white/10 p-4 ${confidence.background}`}
+                >
+                  <p className="text-sm text-slate-400">Forecast confidence</p>
+                  <p className={`mt-1 text-2xl font-bold ${confidence.color}`}>
+                    {confidence.label}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    {confidence.description}
+                  </p>
+                </div>
+              )}
 
-    <p className={`mt-1 text-2xl font-bold ${confidence.color}`}>
-      {confidence.label}
-    </p>
+              <div className="mt-4 grid gap-3 md:hidden">
+                {weather.models.map((model) => (
+                  <article
+                    key={model.name}
+                    className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+                  >
+                    <h3 className="text-lg font-bold">{model.name}</h3>
 
-    <p className="mt-1 text-sm text-slate-300">
-      {confidence.description}
-    </p>
-  </div>
-)}
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <p>
+                        <span className="block text-slate-400">Temperature</span>
+                        {model.temperature.toFixed(1)}°C
+                      </p>
+                      <p>
+                        <span className="block text-slate-400">Rain chance</span>
+                        {model.precipitationProbability.toFixed(0)}%
+                      </p>
+                      <p>
+                        <span className="block text-slate-400">Precipitation</span>
+                        {model.precipitation.toFixed(1)} mm
+                      </p>
+                      <p>
+                        <span className="block text-slate-400">Wind</span>
+                        {model.windSpeed.toFixed(1)} m/s
+                      </p>
+                    </div>
+                  </article>
+                ))}
               </div>
-<div className="grid gap-3 md:hidden">
-  {weather.models.map((model) => (
-    <article
-      key={model.name}
-      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
-    >
-      <h3 className="text-lg font-bold">{model.name}</h3>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-slate-400">Temperature</p>
-          <p className="mt-1 font-semibold">
-            {model.temperature.toFixed(1)}°C
-          </p>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Rain chance</p>
-          <p className="mt-1 font-semibold">
-            {model.precipitationProbability.toFixed(0)}%
-          </p>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Precipitation</p>
-          <p className="mt-1 font-semibold">
-            {model.precipitation.toFixed(1)} mm
-          </p>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Wind</p>
-          <p className="mt-1 font-semibold">
-            {model.windSpeed.toFixed(1)} m/s
-          </p>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Gusts</p>
-          <p className="mt-1 font-semibold">
-            {model.windGusts.toFixed(1)} m/s
-          </p>
-        </div>
-      </div>
-    </article>
-  ))}
-
-  <article className="rounded-2xl border border-sky-400/30 bg-sky-500/10 p-4">
-    <p className="text-sm font-semibold uppercase tracking-wider text-sky-300">
-      Weather Consensus
-    </p>
-
-    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-      <div>
-        <p className="text-slate-400">Temperature</p>
-        <p className="mt-1 font-semibold">
-          {weather.consensus.temperature.toFixed(1)}°C
-        </p>
-      </div>
-
-      <div>
-        <p className="text-slate-400">Rain chance</p>
-        <p className="mt-1 font-semibold">
-          {weather.consensus.precipitationProbability.toFixed(0)}%
-        </p>
-      </div>
-
-      <div>
-        <p className="text-slate-400">Precipitation</p>
-        <p className="mt-1 font-semibold">
-          {weather.consensus.precipitation.toFixed(1)} mm
-        </p>
-      </div>
-
-      <div>
-        <p className="text-slate-400">Wind</p>
-        <p className="mt-1 font-semibold">
-          {weather.consensus.windSpeed.toFixed(1)} m/s
-        </p>
-      </div>
-
-      <div>
-        <p className="text-slate-400">Gusts</p>
-        <p className="mt-1 font-semibold">
-          {weather.consensus.windGusts.toFixed(1)} m/s
-        </p>
-      </div>
-    </div>
-  </article>
-</div>
-              <div className="hidden overflow-x-auto rounded-2xl border border-slate-800 md:block">
+              <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-slate-800 md:block">
                 <table className="min-w-full divide-y divide-slate-800 bg-slate-900 text-left">
                   <thead className="bg-slate-800/70 text-sm text-slate-300">
                     <tr>
-                      <th className="px-5 py-4 font-semibold">Model</th>
-                      <th className="px-5 py-4 font-semibold">Temperature</th>
-                      <th className="px-5 py-4 font-semibold">Rain chance</th>
-                      <th className="px-5 py-4 font-semibold">Precipitation</th>
-                      <th className="px-5 py-4 font-semibold">Wind</th>
-                      <th className="px-5 py-4 font-semibold">Gusts</th>
+                      <th className="px-5 py-4">Model</th>
+                      <th className="px-5 py-4">Temperature</th>
+                      <th className="px-5 py-4">Rain chance</th>
+                      <th className="px-5 py-4">Precipitation</th>
+                      <th className="px-5 py-4">Wind</th>
+                      <th className="px-5 py-4">Gusts</th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-800">
                     {weather.models.map((model) => (
-                      <tr key={model.name} className="text-slate-200">
-                        <td className="px-5 py-4 font-semibold text-white">
-                          {model.name}
-                        </td>
+                      <tr key={model.name}>
+                        <td className="px-5 py-4 font-semibold">{model.name}</td>
                         <td className="px-5 py-4">
                           {model.temperature.toFixed(1)}°C
                         </td>
@@ -566,27 +519,6 @@ export default function Home() {
                         </td>
                       </tr>
                     ))}
-
-                    <tr className="bg-sky-500/10 text-sky-100">
-                      <td className="px-5 py-4 font-bold">
-                        Weather Consensus
-                      </td>
-                      <td className="px-5 py-4 font-bold">
-                        {weather.consensus.temperature.toFixed(1)}°C
-                      </td>
-                      <td className="px-5 py-4 font-bold">
-                        {weather.consensus.precipitationProbability.toFixed(0)}%
-                      </td>
-                      <td className="px-5 py-4 font-bold">
-                        {weather.consensus.precipitation.toFixed(1)} mm
-                      </td>
-                      <td className="px-5 py-4 font-bold">
-                        {weather.consensus.windSpeed.toFixed(1)} m/s
-                      </td>
-                      <td className="px-5 py-4 font-bold">
-                        {weather.consensus.windGusts.toFixed(1)} m/s
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
