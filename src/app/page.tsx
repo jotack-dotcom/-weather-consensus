@@ -451,6 +451,40 @@ export default function Home() {
                 Model comparison
               </p>
               <h2 className="text-2xl font-bold">Weather Consensus</h2>
+              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-5">
+  <h3 className="text-lg font-bold text-sky-200">
+    How does Consensus work?
+  </h3>
+
+  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+    HowHot.today compares forecasts from ECMWF, NOAA and DWD. We use
+    the median result, so one model with an unusual prediction has less
+    influence on the final forecast.
+  </p>
+
+  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+    <div className="rounded-xl bg-slate-950/40 p-3">
+      <p className="font-semibold text-white">1. Compare models</p>
+      <p className="mt-1 text-slate-400">
+        ECMWF, NOAA and DWD make separate predictions.
+      </p>
+    </div>
+
+    <div className="rounded-xl bg-slate-950/40 p-3">
+      <p className="font-semibold text-white">2. Find the median</p>
+      <p className="mt-1 text-slate-400">
+        Extreme predictions affect the result less.
+      </p>
+    </div>
+
+    <div className="rounded-xl bg-slate-950/40 p-3">
+      <p className="font-semibold text-white">3. Show confidence</p>
+      <p className="mt-1 text-slate-400">
+        You can see when the models agree or disagree.
+      </p>
+    </div>
+  </div>
+</div>
 
               {confidence && (
                 <div
