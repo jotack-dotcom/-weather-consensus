@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     const weatherUrl =
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
       `&longitude=${longitude}` +
-      `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m` +
+      `&current=weather_code,temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max` +
       `&forecast_days=7` +
       `&wind_speed_unit=ms` +
@@ -241,6 +241,7 @@ export async function GET(request: Request) {
       country,
       latitude,
       longitude,
+      weatherCode: weatherData.current.weather_code,
       temperature: weatherData.current.temperature_2m,
       precipitation: weatherData.current.precipitation,
       precipitationProbability:

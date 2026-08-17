@@ -23,6 +23,7 @@ type ModelResult = {
 };
 
 type Weather = {
+  weatherCode: number;
   city: string;
   country: string;
   temperature: number;
@@ -339,12 +340,22 @@ export default function Home() {
             <section className="mb-8 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-xl sm:p-8">
               <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
                 <div>
-                  <p className="text-sm text-sky-400">Current weather</p>
-                  <h2 className="text-3xl font-bold">{weather.city}</h2>
-                  {weather.country && (
-                    <p className="text-slate-400">{weather.country}</p>
-                  )}
-                </div>
+  <p className="text-sm text-sky-400">Current weather</p>
+
+  <div className="mt-1 flex items-center gap-3">
+    <span className="text-5xl" aria-hidden="true">
+      {weatherIcon(weather.weatherCode)}
+    </span>
+
+    <div>
+      <h2 className="text-3xl font-bold">{weather.city}</h2>
+
+      {weather.country && (
+        <p className="text-slate-400">{weather.country}</p>
+      )}
+    </div>
+  </div>
+</div>
 
                 <p className="text-sm text-slate-400">
                   Consensus from available weather models
