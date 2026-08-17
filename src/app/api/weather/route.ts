@@ -18,6 +18,16 @@ function median(values: number[]) {
     : sorted[middle];
 }
 
+function mostCommon(values: number[]) {
+  const counts = new Map<number, number>();
+
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -114,13 +124,15 @@ export async function GET(request: Request) {
       { name: "DWD", model: "icon_seamless" },
     ];
 
-    const models = await Promise.all(
+    const modelsWithForecasts = await Promise.all(
       modelInformation.map(async (modelInformation) => {
         const modelUrl =
           `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
           `&longitude=${longitude}` +
           `&models=${modelInformation.model}` +
           `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m` +
+          `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max` +
+          `&forecast_days=7` +
           `&wind_speed_unit=ms` +
           `&timezone=auto`;
 
@@ -144,8 +156,13 @@ export async function GET(request: Request) {
           precipitation: modelData.current.precipitation,
           windSpeed: modelData.current.wind_speed_10m,
           windGusts: modelData.current.wind_gusts_10m,
-        } satisfies ModelResult;
+          daily: modelData.daily,
+        };
       })
+    );
+
+    const models: ModelResult[] = modelsWithForecasts.map(
+      ({ daily: _daily, ...model }) => model
     );
 
     const consensus = {
@@ -156,6 +173,67 @@ export async function GET(request: Request) {
       precipitation: median(models.map((model) => model.precipitation)),
       windSpeed: median(models.map((model) => model.windSpeed)),
       windGusts: median(models.map((model) => model.windGusts)),
+    };
+
+    const forecast = {
+      time: weatherData.daily.time,
+      weather_code: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          mostCommon(
+            modelsWithForecasts.map(
+              (model) => model.daily.weather_code[index]
+            )
+          )
+      ),
+      temperature_2m_max: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) => model.daily.temperature_2m_max[index]
+            )
+          )
+      ),
+      temperature_2m_min: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) => model.daily.temperature_2m_min[index]
+            )
+          )
+      ),
+      precipitation_probability_max: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) =>
+                model.daily.precipitation_probability_max[index]
+            )
+          )
+      ),
+      precipitation_sum: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) => model.daily.precipitation_sum[index]
+            )
+          )
+      ),
+      wind_speed_10m_max: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) => model.daily.wind_speed_10m_max[index]
+            )
+          )
+      ),
+      wind_gusts_10m_max: weatherData.daily.time.map(
+        (_date: string, index: number) =>
+          median(
+            modelsWithForecasts.map(
+              (model) => model.daily.wind_gusts_10m_max[index]
+            )
+          )
+      ),
     };
 
     return NextResponse.json({
@@ -170,7 +248,7 @@ export async function GET(request: Request) {
       windSpeed: weatherData.current.wind_speed_10m,
       windGusts: weatherData.current.wind_gusts_10m,
       windDirection: weatherData.current.wind_direction_10m,
-      forecast: weatherData.daily,
+      forecast,
       models,
       consensus,
     });
