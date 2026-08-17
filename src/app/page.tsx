@@ -261,16 +261,16 @@ export default function Home() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-10">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
-            Weather Consensus
-          </p>
+  HowHot.today
+</p>
 
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Compare weather models
-          </h1>
+<h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+  Today&apos;s weather, with more confidence.
+</h1>
 
-          <p className="mt-3 max-w-2xl text-slate-300">
-            A combined weather forecast based on multiple models.
-          </p>
+<p className="mt-3 max-w-2xl text-slate-300">
+  Compare multiple weather models to get a clearer forecast for your day.
+</p>
         </header>
 
         <form
