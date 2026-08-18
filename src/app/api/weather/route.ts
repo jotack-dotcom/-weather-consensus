@@ -102,6 +102,7 @@ export async function GET(request: Request) {
     const weatherUrl =
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
       `&longitude=${longitude}` +
+      `&hourly=weather_code,temperature_2m,precipitation_probability,wind_speed_10m` +
       `&current=weather_code,temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max` +
       `&forecast_days=7` +
@@ -132,6 +133,7 @@ export async function GET(request: Request) {
           `&models=${modelInformation.model}` +
           `&current=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m` +
           `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max` +
+          `&hourly=weather_code,temperature_2m,precipitation_probability,wind_speed_10m` +
           `&forecast_days=7` +
           `&wind_speed_unit=ms` +
           `&timezone=auto`;
@@ -157,13 +159,14 @@ export async function GET(request: Request) {
           windSpeed: modelData.current.wind_speed_10m,
           windGusts: modelData.current.wind_gusts_10m,
           daily: modelData.daily,
+          hourly: modelData.hourly,
         };
       })
     );
 
     const models: ModelResult[] = modelsWithForecasts.map(
-      ({ daily: _daily, ...model }) => model
-    );
+  ({ daily: _daily, hourly: _hourly, ...model }) => model
+);
 
     const consensus = {
       temperature: median(models.map((model) => model.temperature)),
@@ -236,12 +239,49 @@ export async function GET(request: Request) {
       ),
     };
 
+    const hourly = {
+  time: weatherData.hourly.time,
+  weather_code: weatherData.hourly.time.map(
+    (_time: string, index: number) =>
+      mostCommon(
+        modelsWithForecasts.map(
+          (model) => model.hourly.weather_code[index]
+        )
+      )
+  ),
+  temperature_2m: weatherData.hourly.time.map(
+    (_time: string, index: number) =>
+      median(
+        modelsWithForecasts.map(
+          (model) => model.hourly.temperature_2m[index]
+        )
+      )
+  ),
+  precipitation_probability: weatherData.hourly.time.map(
+    (_time: string, index: number) =>
+      median(
+        modelsWithForecasts.map(
+          (model) => model.hourly.precipitation_probability[index]
+        )
+      )
+  ),
+  wind_speed_10m: weatherData.hourly.time.map(
+    (_time: string, index: number) =>
+      median(
+        modelsWithForecasts.map(
+          (model) => model.hourly.wind_speed_10m[index]
+        )
+      )
+  ),
+};
+
     return NextResponse.json({
       city: locationName,
       country,
       latitude,
       longitude,
       weatherCode: weatherData.current.weather_code,
+      currentTime: weatherData.current.time,
       temperature: weatherData.current.temperature_2m,
       precipitation: weatherData.current.precipitation,
       precipitationProbability:
@@ -250,6 +290,7 @@ export async function GET(request: Request) {
       windGusts: weatherData.current.wind_gusts_10m,
       windDirection: weatherData.current.wind_direction_10m,
       forecast,
+      hourly,
       models,
       consensus,
     });

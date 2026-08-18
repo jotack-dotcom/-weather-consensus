@@ -13,6 +13,13 @@ type Forecast = {
   wind_gusts_10m_max?: Array<number | null>;
 };
 
+type Hourly = {
+  time?: string[];
+  weather_code?: Array<number | null>;
+  temperature_2m?: Array<number | null>;
+  precipitation_probability?: Array<number | null>;
+  wind_speed_10m?: Array<number | null>;
+};
 type ModelResult = {
   name: string;
   temperature: number | null;
@@ -25,6 +32,8 @@ type ModelResult = {
 type Consensus = Omit<ModelResult, "name">;
 
 type Weather = {
+  currentTime?: string;
+hourly?: Hourly;
   city: string;
   country?: string;
   weatherCode?: number | null;
@@ -112,11 +121,18 @@ function weatherDescription(code: number | null | undefined) {
 }
 
 function formatDate(date: string) {
+  function formatHour(time: string) {
+  return time.slice(11, 16);
+}
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
   }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatHour(time: string) {
+  return time.slice(11, 16);
 }
 
 function getConfidence(models: ModelResult[]) {
@@ -316,18 +332,46 @@ export default function Home() {
   const confidence = getConfidence(models);
 
   const daily = Array.isArray(weather?.forecast?.time)
-    ? weather.forecast.time.map((date, index) => ({
-        date,
-        weatherCode: weather.forecast?.weather_code?.[index],
-        temperatureMax: weather.forecast?.temperature_2m_max?.[index],
-        temperatureMin: weather.forecast?.temperature_2m_min?.[index],
-        precipitationProbability:
-          weather.forecast?.precipitation_probability_max?.[index],
-        precipitationSum: weather.forecast?.precipitation_sum?.[index],
-        windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
-        windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
-      }))
-    : [];
+  ? weather.forecast.time.map((date, index) => ({
+      date,
+      weatherCode: weather.forecast?.weather_code?.[index],
+      temperatureMax: weather.forecast?.temperature_2m_max?.[index],
+      temperatureMin: weather.forecast?.temperature_2m_min?.[index],
+      precipitationProbability:
+        weather.forecast?.precipitation_probability_max?.[index],
+      precipitationSum: weather.forecast?.precipitation_sum?.[index],
+      windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
+      windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
+    }))
+  : [];
+
+const currentHour = weather?.currentTime?.slice(0, 13);
+
+const nextHourIndex = currentHour
+  ? Math.max(
+      weather?.hourly?.time?.findIndex(
+        (time) => time.slice(0, 13) >= currentHour
+      ) ?? 0,
+      0
+    )
+  : 0;
+
+const upcomingHours = Array.isArray(weather?.hourly?.time)
+  ? weather.hourly.time
+      .slice(nextHourIndex, nextHourIndex + 12)
+      .map((time, index) => {
+        const hourlyIndex = nextHourIndex + index;
+
+        return {
+          time,
+          weatherCode: weather.hourly?.weather_code?.[hourlyIndex],
+          temperature: weather.hourly?.temperature_2m?.[hourlyIndex],
+          rainChance:
+            weather.hourly?.precipitation_probability?.[hourlyIndex],
+          windSpeed: weather.hourly?.wind_speed_10m?.[hourlyIndex],
+        };
+      })
+  : [];
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-8 sm:py-10">
@@ -519,7 +563,42 @@ export default function Home() {
                 </div>
               </div>
             </section>
+<section className="mt-7 sm:mt-8">
+  <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+    Hourly forecast
+  </p>
 
+  <h2 className="mb-4 text-2xl font-bold">The next 12 hours</h2>
+
+  <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
+    {upcomingHours.map((hour) => (
+      <article
+        key={hour.time}
+        className="w-32 shrink-0 snap-start rounded-xl border border-slate-800 bg-slate-900 p-3"
+      >
+        <p className="text-sm font-semibold text-slate-300">
+          {formatHour(hour.time)}
+        </p>
+
+        <span className="mt-3 block text-3xl" aria-hidden="true">
+          {weatherIcon(hour.weatherCode)}
+        </span>
+
+        <p className="mt-3 text-xl font-bold">
+          {formatNumber(hour.temperature, 0)}°
+        </p>
+
+        <p className="mt-2 text-xs text-slate-400">
+          Rain: {formatNumber(hour.rainChance, 0)}%
+        </p>
+
+        <p className="mt-1 text-xs text-slate-400">
+          Wind: {formatNumber(hour.windSpeed, 1)} m/s
+        </p>
+      </article>
+    ))}
+  </div>
+</section>
             <section className="mt-7 sm:mt-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 7-day consensus
