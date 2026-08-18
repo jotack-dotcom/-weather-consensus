@@ -57,13 +57,19 @@ export default function PrivacyPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold">Your choices</h2>
-            <p className="mt-2 leading-7 text-slate-300">
-              You can choose not to share your location and search for a city
-              instead. If advertising or additional tracking is added in the
-              future, this privacy page will be updated.
-            </p>
-          </div>
+  <h2 className="text-xl font-bold">Your choices</h2>
+
+  <p className="mt-2 leading-7 text-slate-300">
+    You can choose not to share your location and search for a city instead.
+    Favorite cities are saved only in your own browser and are not sent to our
+    servers. You can remove favorites at any time using the × button.
+  </p>
+
+  <p className="mt-2 leading-7 text-slate-300">
+    If advertising or additional tracking is added in the future, this privacy
+    page will be updated.
+  </p>
+</div>
 
           <div>
             <h2 className="text-xl font-bold">Contact</h2>
