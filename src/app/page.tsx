@@ -209,6 +209,23 @@ export default function Home() {
   const [locationMessage, setLocationMessage] = useState("");
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+useEffect(() => {
+  try {
+    const savedFavorites = localStorage.getItem("howhot-favorites");
+
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites));
+    }
+  } catch {
+    setFavorites([]);
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("howhot-favorites", JSON.stringify(favorites));
+}, [favorites]);
 
   useEffect(() => {
     const query = searchCity.trim();
@@ -281,6 +298,29 @@ export default function Home() {
       );
       return;
     }
+    function toggleFavorite(city: string) {
+  setFavorites((currentFavorites) => {
+    const alreadySaved = currentFavorites.some(
+      (favorite) => favorite.toLowerCase() === city.toLowerCase()
+    );
+
+    if (alreadySaved) {
+      return currentFavorites.filter(
+        (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+      );
+    }
+
+    return [...currentFavorites, city];
+  });
+}
+
+function removeFavorite(city: string) {
+  setFavorites((currentFavorites) =>
+    currentFavorites.filter(
+      (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+    )
+  );
+}
 
     setLocating(true);
     setLocationMessage("");
@@ -327,6 +367,29 @@ export default function Home() {
       }
     );
   }
+function toggleFavorite(city: string) {
+  setFavorites((currentFavorites) => {
+    const alreadySaved = currentFavorites.some(
+      (favorite) => favorite.toLowerCase() === city.toLowerCase()
+    );
+
+    if (alreadySaved) {
+      return currentFavorites.filter(
+        (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+      );
+    }
+
+    return [...currentFavorites, city];
+  });
+}
+
+function removeFavorite(city: string) {
+  setFavorites((currentFavorites) =>
+    currentFavorites.filter(
+      (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+    )
+  );
+}
 
   const models = Array.isArray(weather?.models) ? weather.models : [];
   const confidence = getConfidence(models);
@@ -372,7 +435,11 @@ const upcomingHours = Array.isArray(weather?.hourly?.time)
         };
       })
   : [];
-
+const isCurrentCityFavorite = weather
+  ? favorites.some(
+      (favorite) => favorite.toLowerCase() === weather.city.toLowerCase()
+    )
+  : false;
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-8 sm:py-10">
       <div className="mx-auto max-w-6xl">
@@ -450,6 +517,43 @@ const upcomingHours = Array.isArray(weather?.hourly?.time)
         >
           {locating ? "Getting your location..." : "Use my location"}
         </button>
+        {favorites.length > 0 && (
+  <section className="mt-4">
+    <p className="mb-2 text-sm font-semibold text-slate-400">
+      Favorite cities
+    </p>
+
+    <div className="flex flex-wrap gap-2">
+      {favorites.map((favorite) => (
+        <div
+          key={favorite}
+          className="flex overflow-hidden rounded-lg border border-slate-700 bg-slate-900"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSearchCity(favorite);
+              setLocationMessage("");
+              void loadWeather(favorite);
+            }}
+            className="px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-800"
+          >
+            {favorite}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => removeFavorite(favorite)}
+            aria-label={`Remove ${favorite} from favorites`}
+            className="border-l border-slate-700 px-3 py-2 text-slate-400 transition hover:bg-red-500/20 hover:text-red-300"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
         {locationMessage && (
           <p className="mt-3 text-sm text-slate-400">{locationMessage}</p>
@@ -509,7 +613,15 @@ const upcomingHours = Array.isArray(weather?.hourly?.time)
                   Consensus from ECMWF, NOAA and DWD
                 </p>
               </div>
-
+{weather.city !== "Your location" && (
+  <button
+    type="button"
+    onClick={() => toggleFavorite(weather.city)}
+    className="mb-4 rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/20"
+  >
+    {isCurrentCityFavorite ? "★ Saved as favorite" : "☆ Save as favorite"}
+  </button>
+)}
               <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
                 <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
                   <p className="text-xs text-slate-400 sm:text-sm">
