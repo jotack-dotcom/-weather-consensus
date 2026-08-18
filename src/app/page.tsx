@@ -3,38 +3,35 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Forecast = {
-  time: string[];
-  weather_code: number[];
-  temperature_2m_max: number[];
-  temperature_2m_min: number[];
-  precipitation_probability_max: number[];
-  precipitation_sum: number[];
-  wind_speed_10m_max: number[];
-  wind_gusts_10m_max: number[];
+  time?: string[];
+  weather_code?: Array<number | null>;
+  temperature_2m_max?: Array<number | null>;
+  temperature_2m_min?: Array<number | null>;
+  precipitation_probability_max?: Array<number | null>;
+  precipitation_sum?: Array<number | null>;
+  wind_speed_10m_max?: Array<number | null>;
+  wind_gusts_10m_max?: Array<number | null>;
 };
 
 type ModelResult = {
   name: string;
-  temperature: number;
-  precipitationProbability: number;
-  precipitation: number;
-  windSpeed: number;
-  windGusts: number;
+  temperature: number | null;
+  precipitationProbability: number | null;
+  precipitation: number | null;
+  windSpeed: number | null;
+  windGusts: number | null;
 };
+
+type Consensus = Omit<ModelResult, "name">;
 
 type Weather = {
   city: string;
-  country: string;
-  weatherCode: number;
-  temperature: number;
-  precipitation: number;
-  precipitationProbability: number;
-  windSpeed: number;
-  windGusts: number;
-  windDirection: number;
-  forecast: Forecast;
-  models: ModelResult[];
-  consensus: Omit<ModelResult, "name">;
+  country?: string;
+  weatherCode?: number | null;
+  windDirection?: number | null;
+  forecast?: Forecast;
+  models?: ModelResult[];
+  consensus?: Consensus;
   error?: string;
 };
 
@@ -45,7 +42,22 @@ type LocationSuggestion = {
   admin1?: string;
 };
 
-function windDirectionToText(degrees: number) {
+function formatNumber(
+  value: number | null | undefined,
+  decimals = 1
+) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return value.toFixed(decimals);
+}
+
+function windDirectionToText(degrees: number | null | undefined) {
+  if (typeof degrees !== "number") {
+    return "—";
+  }
+
   const directions = [
     "North",
     "North-East",
@@ -60,7 +72,7 @@ function windDirectionToText(degrees: number) {
   return directions[Math.round(degrees / 45) % 8];
 }
 
-function weatherIcon(code: number | undefined) {
+function weatherIcon(code: number | null | undefined) {
   if (code === 0) return "☀️";
   if (code === 1) return "🌤️";
   if (code === 2) return "⛅";
@@ -76,7 +88,7 @@ function weatherIcon(code: number | undefined) {
   return "🌤️";
 }
 
-function weatherDescription(code: number | undefined) {
+function weatherDescription(code: number | null | undefined) {
   const descriptions: Record<number, string> = {
     0: "Clear sky",
     1: "Mainly clear",
@@ -111,10 +123,22 @@ function formatDate(date: string) {
 }
 
 function getConfidence(models: ModelResult[]) {
-  const temperatures = models.map((model) => model.temperature);
-  const rainChances = models.map(
-    (model) => model.precipitationProbability
-  );
+  const temperatures = models
+    .map((model) => model.temperature)
+    .filter((value): value is number => typeof value === "number");
+
+  const rainChances = models
+    .map((model) => model.precipitationProbability)
+    .filter((value): value is number => typeof value === "number");
+
+  if (temperatures.length < 2 || rainChances.length < 2) {
+    return {
+      label: "Unavailable",
+      description: "Not enough model data is available.",
+      color: "text-slate-300",
+      background: "bg-slate-800",
+    };
+  }
 
   const temperatureDifference =
     Math.max(...temperatures) - Math.min(...temperatures);
@@ -293,20 +317,22 @@ export default function Home() {
     );
   }
 
-  const daily =
-    weather?.forecast.time.map((date, index) => ({
-      date,
-      weatherCode: weather.forecast.weather_code[index],
-      temperatureMax: weather.forecast.temperature_2m_max[index],
-      temperatureMin: weather.forecast.temperature_2m_min[index],
-      precipitationProbability:
-        weather.forecast.precipitation_probability_max[index],
-      precipitationSum: weather.forecast.precipitation_sum[index],
-      windSpeedMax: weather.forecast.wind_speed_10m_max[index],
-      windGustsMax: weather.forecast.wind_gusts_10m_max[index],
-    })) ?? [];
+  const models = Array.isArray(weather?.models) ? weather.models : [];
+  const confidence = getConfidence(models);
 
-  const confidence = weather ? getConfidence(weather.models) : null;
+  const daily = Array.isArray(weather?.forecast?.time)
+    ? weather.forecast.time.map((date, index) => ({
+        date,
+        weatherCode: weather.forecast?.weather_code?.[index],
+        temperatureMax: weather.forecast?.temperature_2m_max?.[index],
+        temperatureMin: weather.forecast?.temperature_2m_min?.[index],
+        precipitationProbability:
+          weather.forecast?.precipitation_probability_max?.[index],
+        precipitationSum: weather.forecast?.precipitation_sum?.[index],
+        windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
+        windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
+      }))
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8">
@@ -358,6 +384,7 @@ export default function Home() {
                     <span className="block font-semibold text-white">
                       {suggestion.name}
                     </span>
+
                     <span className="text-sm text-slate-400">
                       {suggestion.admin1
                         ? `${suggestion.admin1}, ${suggestion.country}`
@@ -396,9 +423,11 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
               Your weather
             </p>
+
             <h2 className="mt-2 text-2xl font-bold">
               Find a forecast for anywhere in the world.
             </h2>
+
             <p className="mt-3 max-w-2xl text-slate-300">
               Search for a city above, or use your current location to see a
               Weather Consensus from multiple models.
@@ -434,6 +463,7 @@ export default function Home() {
 
                     <div>
                       <h2 className="text-3xl font-bold">{weather.city}</h2>
+
                       {weather.country && (
                         <p className="text-slate-400">{weather.country}</p>
                       )}
@@ -450,28 +480,32 @@ export default function Home() {
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Temperature</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.consensus.temperature.toFixed(1)}°C
+                    {formatNumber(weather.consensus?.temperature, 1)}°C
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Precipitation</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.consensus.precipitation.toFixed(1)} mm
+                    {formatNumber(weather.consensus?.precipitation, 1)} mm
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Rain probability</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.consensus.precipitationProbability.toFixed(0)}%
+                    {formatNumber(
+                      weather.consensus?.precipitationProbability,
+                      0
+                    )}
+                    %
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Wind</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.consensus.windSpeed.toFixed(1)} m/s
+                    {formatNumber(weather.consensus?.windSpeed, 1)} m/s
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
                     {windDirectionToText(weather.windDirection)}
@@ -481,7 +515,7 @@ export default function Home() {
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Wind gusts</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.consensus.windGusts.toFixed(1)} m/s
+                    {formatNumber(weather.consensus?.windGusts, 1)} m/s
                   </p>
                 </div>
               </div>
@@ -491,6 +525,7 @@ export default function Home() {
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 7-day consensus
               </p>
+
               <h2 className="mb-4 text-2xl font-bold">
                 Forecast from multiple models
               </h2>
@@ -509,21 +544,24 @@ export default function Home() {
                       <span className="text-3xl" aria-hidden="true">
                         {weatherIcon(day.weatherCode)}
                       </span>
+
                       <span>{weatherDescription(day.weatherCode)}</span>
                     </div>
 
                     <p className="mt-4 text-xl font-bold">
-                      {day.temperatureMax.toFixed(0)}°
+                      {formatNumber(day.temperatureMax, 0)}°
                       <span className="ml-2 text-base font-normal text-slate-400">
-                        {day.temperatureMin.toFixed(0)}°
+                        {formatNumber(day.temperatureMin, 0)}°
                       </span>
                     </p>
 
                     <div className="mt-4 space-y-1 text-sm text-slate-300">
-                      <p>Rain: {day.precipitationProbability.toFixed(0)}%</p>
-                      <p>{day.precipitationSum.toFixed(1)} mm</p>
-                      <p>Wind: {day.windSpeedMax.toFixed(1)} m/s</p>
-                      <p>Gusts: {day.windGustsMax.toFixed(1)} m/s</p>
+                      <p>
+                        Rain: {formatNumber(day.precipitationProbability, 0)}%
+                      </p>
+                      <p>{formatNumber(day.precipitationSum, 1)} mm</p>
+                      <p>Wind: {formatNumber(day.windSpeedMax, 1)} m/s</p>
+                      <p>Gusts: {formatNumber(day.windGustsMax, 1)} m/s</p>
                     </div>
                   </article>
                 ))}
@@ -536,26 +574,26 @@ export default function Home() {
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 Model comparison
               </p>
+
               <h2 className="text-2xl font-bold">Weather Consensus</h2>
 
-              {confidence && (
-                <div
-                  className={`mt-4 rounded-xl border border-white/10 p-4 ${confidence.background}`}
-                >
-                  <p className="text-sm text-slate-400">Forecast confidence</p>
-                  <p className={`mt-1 text-2xl font-bold ${confidence.color}`}>
-                    {confidence.label}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {confidence.description}
-                  </p>
-                </div>
-              )}
+              <div
+                className={`mt-4 rounded-xl border border-white/10 p-4 ${confidence.background}`}
+              >
+                <p className="text-sm text-slate-400">Forecast confidence</p>
+                <p className={`mt-1 text-2xl font-bold ${confidence.color}`}>
+                  {confidence.label}
+                </p>
+                <p className="mt-1 text-sm text-slate-300">
+                  {confidence.description}
+                </p>
+              </div>
 
               <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-5">
                 <h3 className="font-bold text-sky-200">
                   How does Consensus work?
                 </h3>
+
                 <p className="mt-2 text-sm leading-6 text-slate-300">
                   We compare ECMWF, NOAA and DWD, then use the median result.
                   This makes one unusual model prediction less influential.
@@ -563,7 +601,7 @@ export default function Home() {
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                {weather.models.map((model) => (
+                {models.map((model) => (
                   <article
                     key={model.name}
                     className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
@@ -572,20 +610,29 @@ export default function Home() {
 
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <p>
-                        <span className="block text-slate-400">Temperature</span>
-                        {model.temperature.toFixed(1)}°C
+                        <span className="block text-slate-400">
+                          Temperature
+                        </span>
+                        {formatNumber(model.temperature, 1)}°C
                       </p>
+
                       <p>
-                        <span className="block text-slate-400">Rain chance</span>
-                        {model.precipitationProbability.toFixed(0)}%
+                        <span className="block text-slate-400">
+                          Rain chance
+                        </span>
+                        {formatNumber(model.precipitationProbability, 0)}%
                       </p>
+
                       <p>
-                        <span className="block text-slate-400">Precipitation</span>
-                        {model.precipitation.toFixed(1)} mm
+                        <span className="block text-slate-400">
+                          Precipitation
+                        </span>
+                        {formatNumber(model.precipitation, 1)} mm
                       </p>
+
                       <p>
                         <span className="block text-slate-400">Wind</span>
-                        {model.windSpeed.toFixed(1)} m/s
+                        {formatNumber(model.windSpeed, 1)} m/s
                       </p>
                     </div>
                   </article>
