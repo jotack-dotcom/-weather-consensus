@@ -42,10 +42,7 @@ type LocationSuggestion = {
   admin1?: string;
 };
 
-function formatNumber(
-  value: number | null | undefined,
-  decimals = 1
-) {
+function formatNumber(value: number | null | undefined, decimals = 1) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "—";
   }
@@ -174,7 +171,7 @@ function getConfidence(models: ModelResult[]) {
 
 function AdPlaceholder({ location }: { location: string }) {
   return (
-    <div className="my-8 flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-6 text-center">
+    <div className="my-6 flex min-h-20 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-4 text-center sm:my-8 sm:min-h-28 sm:px-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
           Advertisement
@@ -253,9 +250,7 @@ export default function Home() {
 
     const city = searchCity.trim();
 
-    if (!city) {
-      return;
-    }
+    if (!city) return;
 
     setShowSuggestions(false);
     setSuggestions([]);
@@ -335,18 +330,18 @@ export default function Home() {
     : [];
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8">
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-8 sm:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-10">
+        <header className="mb-7 sm:mb-10">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
             HowHot.today
           </p>
 
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
             Today&apos;s weather, with more confidence.
           </h1>
 
-          <p className="mt-3 max-w-2xl text-slate-300">
+          <p className="mt-3 max-w-2xl text-base text-slate-300 sm:text-lg">
             Compare multiple weather models to get a clearer forecast.
           </p>
         </header>
@@ -384,7 +379,6 @@ export default function Home() {
                     <span className="block font-semibold text-white">
                       {suggestion.name}
                     </span>
-
                     <span className="text-sm text-slate-400">
                       {suggestion.admin1
                         ? `${suggestion.admin1}, ${suggestion.country}`
@@ -419,15 +413,13 @@ export default function Home() {
         )}
 
         {!weather && !loading && !error && (
-          <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8">
+          <section className="mt-7 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:mt-8 sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
               Your weather
             </p>
-
             <h2 className="mt-2 text-2xl font-bold">
               Find a forecast for anywhere in the world.
             </h2>
-
             <p className="mt-3 max-w-2xl text-slate-300">
               Search for a city above, or use your current location to see a
               Weather Consensus from multiple models.
@@ -436,13 +428,13 @@ export default function Home() {
         )}
 
         {error && (
-          <div className="mt-8 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
+          <div className="mt-7 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200 sm:mt-8">
             {error}
           </div>
         )}
 
         {loading && (
-          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-300">
+          <div className="mt-7 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-slate-300 sm:mt-8 sm:p-6">
             Loading weather...
           </div>
         )}
@@ -451,19 +443,18 @@ export default function Home() {
           <>
             <AdPlaceholder location="Below city search" />
 
-            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-xl sm:p-8">
-              <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 shadow-xl sm:p-8">
+              <div className="mb-5 flex flex-col justify-between gap-4 sm:mb-6 sm:flex-row sm:items-end">
                 <div>
                   <p className="text-sm text-sky-400">Current weather</p>
 
                   <div className="mt-1 flex items-center gap-3">
-                    <span className="text-5xl" aria-hidden="true">
+                    <span className="text-4xl sm:text-5xl" aria-hidden="true">
                       {weatherIcon(weather.weatherCode)}
                     </span>
 
                     <div>
                       <h2 className="text-3xl font-bold">{weather.city}</h2>
-
                       {weather.country && (
                         <p className="text-slate-400">{weather.country}</p>
                       )}
@@ -476,24 +467,30 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div className="rounded-xl bg-slate-800/70 p-4">
-                  <p className="text-sm text-slate-400">Temperature</p>
-                  <p className="mt-1 text-3xl font-bold">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+                <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
+                  <p className="text-xs text-slate-400 sm:text-sm">
+                    Temperature
+                  </p>
+                  <p className="mt-1 text-2xl font-bold sm:text-3xl">
                     {formatNumber(weather.consensus?.temperature, 1)}°C
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-800/70 p-4">
-                  <p className="text-sm text-slate-400">Precipitation</p>
-                  <p className="mt-1 text-3xl font-bold">
+                <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
+                  <p className="text-xs text-slate-400 sm:text-sm">
+                    Precipitation
+                  </p>
+                  <p className="mt-1 text-2xl font-bold sm:text-3xl">
                     {formatNumber(weather.consensus?.precipitation, 1)} mm
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-800/70 p-4">
-                  <p className="text-sm text-slate-400">Rain probability</p>
-                  <p className="mt-1 text-3xl font-bold">
+                <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
+                  <p className="text-xs text-slate-400 sm:text-sm">
+                    Rain probability
+                  </p>
+                  <p className="mt-1 text-2xl font-bold sm:text-3xl">
                     {formatNumber(
                       weather.consensus?.precipitationProbability,
                       0
@@ -502,26 +499,28 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-800/70 p-4">
-                  <p className="text-sm text-slate-400">Wind</p>
-                  <p className="mt-1 text-3xl font-bold">
+                <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
+                  <p className="text-xs text-slate-400 sm:text-sm">Wind</p>
+                  <p className="mt-1 text-2xl font-bold sm:text-3xl">
                     {formatNumber(weather.consensus?.windSpeed, 1)} m/s
                   </p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                     {windDirectionToText(weather.windDirection)}
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-800/70 p-4">
-                  <p className="text-sm text-slate-400">Wind gusts</p>
-                  <p className="mt-1 text-3xl font-bold">
+                <div className="col-span-2 rounded-xl bg-slate-800/70 p-3 sm:col-span-1 sm:p-4">
+                  <p className="text-xs text-slate-400 sm:text-sm">
+                    Wind gusts
+                  </p>
+                  <p className="mt-1 text-2xl font-bold sm:text-3xl">
                     {formatNumber(weather.consensus?.windGusts, 1)} m/s
                   </p>
                 </div>
               </div>
             </section>
 
-            <section className="mt-8">
+            <section className="mt-7 sm:mt-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 7-day consensus
               </p>
@@ -530,32 +529,31 @@ export default function Home() {
                 Forecast from multiple models
               </h2>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-7">
                 {daily.map((day, index) => (
                   <article
                     key={day.date}
-                    className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+                    className="rounded-xl border border-slate-800 bg-slate-900 p-3 sm:rounded-2xl sm:p-4"
                   >
-                    <p className="font-semibold">
+                    <p className="text-sm font-semibold sm:text-base">
                       {index === 0 ? "Today" : formatDate(day.date)}
                     </p>
 
-                    <div className="mt-4 flex min-h-12 items-center gap-2 text-sm text-slate-400">
-                      <span className="text-3xl" aria-hidden="true">
+                    <div className="mt-3 flex min-h-10 items-center gap-1 text-xs leading-4 text-slate-400 sm:mt-4 sm:min-h-12 sm:gap-2 sm:text-sm">
+                      <span className="text-2xl sm:text-3xl" aria-hidden="true">
                         {weatherIcon(day.weatherCode)}
                       </span>
-
                       <span>{weatherDescription(day.weatherCode)}</span>
                     </div>
 
-                    <p className="mt-4 text-xl font-bold">
+                    <p className="mt-3 text-lg font-bold sm:mt-4 sm:text-xl">
                       {formatNumber(day.temperatureMax, 0)}°
-                      <span className="ml-2 text-base font-normal text-slate-400">
+                      <span className="ml-1 text-sm font-normal text-slate-400 sm:ml-2 sm:text-base">
                         {formatNumber(day.temperatureMin, 0)}°
                       </span>
                     </p>
 
-                    <div className="mt-4 space-y-1 text-sm text-slate-300">
+                    <div className="mt-3 space-y-1 text-xs text-slate-300 sm:mt-4 sm:text-sm">
                       <p>
                         Rain: {formatNumber(day.precipitationProbability, 0)}%
                       </p>
@@ -589,7 +587,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-5">
+              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-4 sm:p-5">
                 <h3 className="font-bold text-sky-200">
                   How does Consensus work?
                 </h3>
@@ -600,15 +598,15 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="mt-4 grid gap-3 md:grid-cols-3 md:gap-4">
                 {models.map((model) => (
                   <article
                     key={model.name}
-                    className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+                    className="rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-5"
                   >
                     <h3 className="text-lg font-bold">{model.name}</h3>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:mt-4">
                       <p>
                         <span className="block text-slate-400">
                           Temperature
@@ -642,22 +640,23 @@ export default function Home() {
           </>
         )}
       </div>
-      <footer className="mt-12 border-t border-slate-800 py-8 text-center text-sm text-slate-500">
-  <p>© 2026 HowHot.today</p>
 
-  <div className="mt-3 flex justify-center gap-4">
-    <a href="/privacy" className="hover:text-cyan-400">
-      Privacy & Contact
-    </a>
+      <footer className="mt-10 border-t border-slate-800 py-7 text-center text-sm text-slate-500 sm:mt-12 sm:py-8">
+        <p>© 2026 HowHot.today</p>
 
-    <a
-      href="mailto:howhottoday@gmail.com"
-      className="hover:text-cyan-400"
-    >
-      Contact
-    </a>
-  </div>
-</footer>
+        <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <a href="/privacy" className="hover:text-cyan-400">
+            Privacy & Contact
+          </a>
+
+          <a
+            href="mailto:howhottoday@gmail.com"
+            className="hover:text-cyan-400"
+          >
+            Contact
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }
