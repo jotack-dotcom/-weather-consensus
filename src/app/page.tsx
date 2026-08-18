@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 type Forecast = {
   time: string[];
-  weather_code?: number[];
+  weather_code: number[];
   temperature_2m_max: number[];
   temperature_2m_min: number[];
   precipitation_probability_max: number[];
@@ -23,9 +23,9 @@ type ModelResult = {
 };
 
 type Weather = {
-  weatherCode: number;
   city: string;
   country: string;
+  weatherCode: number;
   temperature: number;
   precipitation: number;
   precipitationProbability: number;
@@ -36,6 +36,13 @@ type Weather = {
   models: ModelResult[];
   consensus: Omit<ModelResult, "name">;
   error?: string;
+};
+
+type LocationSuggestion = {
+  id: number;
+  name: string;
+  country: string;
+  admin1?: string;
 };
 
 function windDirectionToText(degrees: number) {
@@ -51,6 +58,22 @@ function windDirectionToText(degrees: number) {
   ];
 
   return directions[Math.round(degrees / 45) % 8];
+}
+
+function weatherIcon(code: number | undefined) {
+  if (code === 0) return "☀️";
+  if (code === 1) return "🌤️";
+  if (code === 2) return "⛅";
+  if (code === 3) return "☁️";
+  if (code === 45 || code === 48) return "🌫️";
+  if ([51, 53, 55, 56, 57].includes(code ?? -1)) return "🌦️";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code ?? -1)) {
+    return "🌧️";
+  }
+  if ([71, 73, 75, 77, 85, 86].includes(code ?? -1)) return "❄️";
+  if ([95, 96, 99].includes(code ?? -1)) return "⛈️";
+
+  return "🌤️";
 }
 
 function weatherDescription(code: number | undefined) {
@@ -79,22 +102,6 @@ function weatherDescription(code: number | undefined) {
   return descriptions[code ?? -1] ?? "Weather forecast";
 }
 
-function weatherIcon(code: number | undefined) {
-  if (code === 0) return "☀️";
-  if (code === 1) return "🌤️";
-  if (code === 2) return "⛅";
-  if (code === 3) return "☁️";
-  if (code === 45 || code === 48) return "🌫️";
-  if ([51, 53, 55, 56, 57].includes(code ?? -1)) return "🌦️";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code ?? -1)) {
-    return "🌧️";
-  }
-  if ([71, 73, 75, 77, 85, 86].includes(code ?? -1)) return "❄️";
-  if ([95, 96, 99].includes(code ?? -1)) return "⛈️";
-
-  return "🌤️";
-}
-
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
@@ -108,22 +115,14 @@ function getConfidence(models: ModelResult[]) {
   const rainChances = models.map(
     (model) => model.precipitationProbability
   );
-  const windSpeeds = models.map((model) => model.windSpeed);
 
   const temperatureDifference =
     Math.max(...temperatures) - Math.min(...temperatures);
 
-  const rainChanceDifference =
+  const rainDifference =
     Math.max(...rainChances) - Math.min(...rainChances);
 
-  const windDifference =
-    Math.max(...windSpeeds) - Math.min(...windSpeeds);
-
-  if (
-    temperatureDifference <= 2 &&
-    rainChanceDifference <= 25 &&
-    windDifference <= 2.5
-  ) {
+  if (temperatureDifference <= 2 && rainDifference <= 25) {
     return {
       label: "High",
       description: "The weather models mostly agree.",
@@ -132,11 +131,7 @@ function getConfidence(models: ModelResult[]) {
     };
   }
 
-  if (
-    temperatureDifference <= 4 &&
-    rainChanceDifference <= 50 &&
-    windDifference <= 5
-  ) {
+  if (temperatureDifference <= 4 && rainDifference <= 50) {
     return {
       label: "Medium",
       description: "The models show some differences.",
@@ -169,22 +164,50 @@ function AdPlaceholder({ location }: { location: string }) {
 }
 
 export default function Home() {
-  const [searchCity, setSearchCity] = useState("Stockholm");
+  const [searchCity, setSearchCity] = useState("");
   const [weather, setWeather] = useState<Weather | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  async function loadWeather(
-    parameters: URLSearchParams,
-    fromLocation = false
-  ) {
+  useEffect(() => {
+    const query = searchCity.trim();
+
+    if (!showSuggestions || query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+            query
+          )}&count=5&language=en&format=json`
+        );
+
+        const data = await response.json();
+        setSuggestions(data.results ?? []);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchCity, showSuggestions]);
+
+  async function loadWeather(city: string) {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`/api/weather?${parameters.toString()}`);
+      const response = await fetch(
+        `/api/weather?city=${encodeURIComponent(city)}`
+      );
+
       const data: Weather = await response.json();
 
       if (!response.ok) {
@@ -198,26 +221,22 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
-
-      if (fromLocation) {
-        setLocating(false);
-      }
     }
   }
-
-  useEffect(() => {
-    void loadWeather(new URLSearchParams({ city: "Stockholm" }));
-  }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const city = searchCity.trim();
 
-    if (city) {
-      setLocationMessage("");
-      void loadWeather(new URLSearchParams({ city }));
+    if (!city) {
+      return;
     }
+
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setLocationMessage("");
+    void loadWeather(city);
   }
 
   function useMyLocation() {
@@ -232,19 +251,38 @@ export default function Home() {
     setLocationMessage("");
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const parameters = new URLSearchParams({
-          latitude: position.coords.latitude.toString(),
-          longitude: position.coords.longitude.toString(),
-        });
+      async (position) => {
+        setLoading(true);
 
-        setLocationMessage("Showing weather for your current location.");
-        void loadWeather(parameters, true);
+        try {
+          const response = await fetch(
+            `/api/weather?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}`
+          );
+
+          const data: Weather = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Could not load weather data.");
+          }
+
+          setWeather(data);
+          setSearchCity("");
+          setShowSuggestions(false);
+          setSuggestions([]);
+          setLocationMessage("Showing weather for your current location.");
+        } catch {
+          setLocationMessage(
+            "We could not load weather for your location. Please search for a city."
+          );
+        } finally {
+          setLoading(false);
+          setLocating(false);
+        }
       },
       () => {
         setLocating(false);
         setLocationMessage(
-          "Location was not shared. Stockholm is still available as the default."
+          "Location was not shared. Please search for a city instead."
         );
       },
       {
@@ -258,7 +296,7 @@ export default function Home() {
   const daily =
     weather?.forecast.time.map((date, index) => ({
       date,
-      weatherCode: weather.forecast.weather_code?.[index],
+      weatherCode: weather.forecast.weather_code[index],
       temperatureMax: weather.forecast.temperature_2m_max[index],
       temperatureMin: weather.forecast.temperature_2m_min[index],
       precipitationProbability:
@@ -283,8 +321,7 @@ export default function Home() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-slate-300">
-            Compare multiple weather models to get a clearer forecast for your
-            day.
+            Compare multiple weather models to get a clearer forecast.
           </p>
         </header>
 
@@ -292,17 +329,50 @@ export default function Home() {
           onSubmit={handleSubmit}
           className="flex flex-col gap-3 sm:flex-row"
         >
-          <input
-            value={searchCity}
-            onChange={(event) => setSearchCity(event.target.value)}
-            placeholder="Search for a city"
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-sky-400 sm:max-w-md"
-          />
+          <div className="relative w-full sm:max-w-md">
+            <input
+              value={searchCity}
+              onChange={(event) => {
+                setSearchCity(event.target.value);
+                setShowSuggestions(true);
+              }}
+              placeholder="Search for a city"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-sky-400"
+            />
+
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchCity(suggestion.name);
+                      setShowSuggestions(false);
+                      setSuggestions([]);
+                      setLocationMessage("");
+                      void loadWeather(suggestion.name);
+                    }}
+                    className="block w-full border-b border-slate-800 px-4 py-3 text-left transition last:border-0 hover:bg-slate-800"
+                  >
+                    <span className="block font-semibold text-white">
+                      {suggestion.name}
+                    </span>
+                    <span className="text-sm text-slate-400">
+                      {suggestion.admin1
+                        ? `${suggestion.admin1}, ${suggestion.country}`
+                        : suggestion.country}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="rounded-xl bg-sky-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl bg-sky-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:opacity-60"
           >
             Search
           </button>
@@ -312,7 +382,7 @@ export default function Home() {
           type="button"
           onClick={useMyLocation}
           disabled={locating}
-          className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400 hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
         >
           {locating ? "Getting your location..." : "Use my location"}
         </button>
@@ -321,44 +391,58 @@ export default function Home() {
           <p className="mt-3 text-sm text-slate-400">{locationMessage}</p>
         )}
 
-        <AdPlaceholder location="Below city search" />
+        {!weather && !loading && !error && (
+          <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+              Your weather
+            </p>
+            <h2 className="mt-2 text-2xl font-bold">
+              Find a forecast for anywhere in the world.
+            </h2>
+            <p className="mt-3 max-w-2xl text-slate-300">
+              Search for a city above, or use your current location to see a
+              Weather Consensus from multiple models.
+            </p>
+          </section>
+        )}
 
         {error && (
-          <div className="mb-8 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
+          <div className="mt-8 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
             {error}
           </div>
         )}
 
-        {loading && !weather && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-slate-300">
-            Loading weather for Stockholm...
+        {loading && (
+          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-300">
+            Loading weather...
           </div>
         )}
 
         {weather && (
           <>
-            <section className="mb-8 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-xl sm:p-8">
-              <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+            <AdPlaceholder location="Below city search" />
+
+            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-xl sm:p-8">
+              <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
-  <p className="text-sm text-sky-400">Current weather</p>
+                  <p className="text-sm text-sky-400">Current weather</p>
 
-  <div className="mt-1 flex items-center gap-3">
-    <span className="text-5xl" aria-hidden="true">
-      {weatherIcon(weather.weatherCode)}
-    </span>
+                  <div className="mt-1 flex items-center gap-3">
+                    <span className="text-5xl" aria-hidden="true">
+                      {weatherIcon(weather.weatherCode)}
+                    </span>
 
-    <div>
-      <h2 className="text-3xl font-bold">{weather.city}</h2>
-
-      {weather.country && (
-        <p className="text-slate-400">{weather.country}</p>
-      )}
-    </div>
-  </div>
-</div>
+                    <div>
+                      <h2 className="text-3xl font-bold">{weather.city}</h2>
+                      {weather.country && (
+                        <p className="text-slate-400">{weather.country}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 <p className="text-sm text-slate-400">
-                  Consensus from available weather models
+                  Consensus from ECMWF, NOAA and DWD
                 </p>
               </div>
 
@@ -366,28 +450,28 @@ export default function Home() {
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Temperature</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.temperature.toFixed(1)}°C
+                    {weather.consensus.temperature.toFixed(1)}°C
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Precipitation</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.precipitation.toFixed(1)} mm
+                    {weather.consensus.precipitation.toFixed(1)} mm
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Rain probability</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.precipitationProbability.toFixed(0)}%
+                    {weather.consensus.precipitationProbability.toFixed(0)}%
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Wind</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.windSpeed.toFixed(1)} m/s
+                    {weather.consensus.windSpeed.toFixed(1)} m/s
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
                     {windDirectionToText(weather.windDirection)}
@@ -397,17 +481,19 @@ export default function Home() {
                 <div className="rounded-xl bg-slate-800/70 p-4">
                   <p className="text-sm text-slate-400">Wind gusts</p>
                   <p className="mt-1 text-3xl font-bold">
-                    {weather.windGusts.toFixed(1)} m/s
+                    {weather.consensus.windGusts.toFixed(1)} m/s
                   </p>
                 </div>
               </div>
             </section>
 
-            <section className="mb-8">
+            <section className="mt-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
-                7-day forecast
+                7-day consensus
               </p>
-              <h2 className="mb-4 text-2xl font-bold">Coming days</h2>
+              <h2 className="mb-4 text-2xl font-bold">
+                Forecast from multiple models
+              </h2>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                 {daily.map((day, index) => (
@@ -451,40 +537,6 @@ export default function Home() {
                 Model comparison
               </p>
               <h2 className="text-2xl font-bold">Weather Consensus</h2>
-              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-5">
-  <h3 className="text-lg font-bold text-sky-200">
-    How does Consensus work?
-  </h3>
-
-  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-    HowHot.today compares forecasts from ECMWF, NOAA and DWD. We use
-    the median result, so one model with an unusual prediction has less
-    influence on the final forecast.
-  </p>
-
-  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-    <div className="rounded-xl bg-slate-950/40 p-3">
-      <p className="font-semibold text-white">1. Compare models</p>
-      <p className="mt-1 text-slate-400">
-        ECMWF, NOAA and DWD make separate predictions.
-      </p>
-    </div>
-
-    <div className="rounded-xl bg-slate-950/40 p-3">
-      <p className="font-semibold text-white">2. Find the median</p>
-      <p className="mt-1 text-slate-400">
-        Extreme predictions affect the result less.
-      </p>
-    </div>
-
-    <div className="rounded-xl bg-slate-950/40 p-3">
-      <p className="font-semibold text-white">3. Show confidence</p>
-      <p className="mt-1 text-slate-400">
-        You can see when the models agree or disagree.
-      </p>
-    </div>
-  </div>
-</div>
 
               {confidence && (
                 <div
@@ -500,11 +552,21 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="mt-4 grid gap-3 md:hidden">
+              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-5">
+                <h3 className="font-bold text-sky-200">
+                  How does Consensus work?
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  We compare ECMWF, NOAA and DWD, then use the median result.
+                  This makes one unusual model prediction less influential.
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
                 {weather.models.map((model) => (
                   <article
                     key={model.name}
-                    className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+                    className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
                   >
                     <h3 className="text-lg font-bold">{model.name}</h3>
 
@@ -528,44 +590,6 @@ export default function Home() {
                     </div>
                   </article>
                 ))}
-              </div>
-
-              <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-slate-800 md:block">
-                <table className="min-w-full divide-y divide-slate-800 bg-slate-900 text-left">
-                  <thead className="bg-slate-800/70 text-sm text-slate-300">
-                    <tr>
-                      <th className="px-5 py-4">Model</th>
-                      <th className="px-5 py-4">Temperature</th>
-                      <th className="px-5 py-4">Rain chance</th>
-                      <th className="px-5 py-4">Precipitation</th>
-                      <th className="px-5 py-4">Wind</th>
-                      <th className="px-5 py-4">Gusts</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-800">
-                    {weather.models.map((model) => (
-                      <tr key={model.name}>
-                        <td className="px-5 py-4 font-semibold">{model.name}</td>
-                        <td className="px-5 py-4">
-                          {model.temperature.toFixed(1)}°C
-                        </td>
-                        <td className="px-5 py-4">
-                          {model.precipitationProbability.toFixed(0)}%
-                        </td>
-                        <td className="px-5 py-4">
-                          {model.precipitation.toFixed(1)} mm
-                        </td>
-                        <td className="px-5 py-4">
-                          {model.windSpeed.toFixed(1)} m/s
-                        </td>
-                        <td className="px-5 py-4">
-                          {model.windGusts.toFixed(1)} m/s
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </section>
           </>
