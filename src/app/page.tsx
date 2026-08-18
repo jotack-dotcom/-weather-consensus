@@ -642,6 +642,22 @@ export default function Home() {
           </>
         )}
       </div>
+      <footer className="mt-12 border-t border-slate-800 py-8 text-center text-sm text-slate-500">
+  <p>© 2026 HowHot.today</p>
+
+  <div className="mt-3 flex justify-center gap-4">
+    <a href="/privacy" className="hover:text-cyan-400">
+      Privacy & Contact
+    </a>
+
+    <a
+      href="mailto:howhottoday@gmail.com"
+      className="hover:text-cyan-400"
+    >
+      Contact
+    </a>
+  </div>
+</footer>
     </main>
   );
 }
