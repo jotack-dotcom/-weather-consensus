@@ -389,7 +389,6 @@ const upcomingHours = Array.isArray(weather?.hourly?.time)
             Compare multiple weather models to get a clearer forecast.
           </p>
         </header>
-
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-3 sm:flex-row"
