@@ -50,6 +50,14 @@ export const metadata: Metadata = {
   },
 };
 
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "HowHot.today",
+  alternateName: "How Hot Today",
+  url: "https://www.howhot.today/",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,7 +68,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteSchema),
+          }}
+        />
+
         {children}
+
         <Analytics />
       </body>
     </html>
