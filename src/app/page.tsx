@@ -442,10 +442,10 @@ const isCurrentCityFavorite = weather
   : false;
   return (
     <main
-  className="min-h-screen bg-slate-950 bg-cover bg-center bg-no-repeat bg-scroll px-4 py-6 text-white sm:bg-fixed sm:px-8 sm:py-10"
+  className="min-h-screen px-4 py-6 text-white sm:px-8 sm:py-10"
   style={{
     backgroundImage:
-  "linear-gradient(180deg, rgba(2, 6, 23, 0.18) 0%, rgba(2, 6, 23, 0.38) 48%, rgba(2, 6, 23, 0.72) 100%), url('/weather-sky.png')",
+      "radial-gradient(circle at 86% 12%, rgba(56, 189, 248, 0.22), transparent 28%), radial-gradient(circle at 12% 92%, rgba(251, 146, 60, 0.12), transparent 26%), linear-gradient(145deg, #020617 0%, #08264a 48%, #020617 100%)",
   }}
 >
       <div className="mx-auto max-w-6xl">
