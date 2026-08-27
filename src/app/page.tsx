@@ -26,6 +26,10 @@ type UvData = {
   index?: Array<number | null>;
   dailyMax?: Array<number | null>;
 };
+type SunData = {
+  sunrise?: string | null;
+  sunset?: string | null;
+};
 
 type ModelResult = {
   name: string;
@@ -42,6 +46,7 @@ type Weather = {
   currentTime?: string;
   hourly?: Hourly;
   uv?: UvData;
+  sun?: SunData;
   city: string;
   country?: string;
   weatherCode?: number | null;
@@ -68,6 +73,11 @@ function formatNumber(value: number | null | undefined, decimals = 1) {
 }
 
 function formatHour(time: string) {
+  return time.slice(11, 16);
+}
+function formatSunTime(time: string | null | undefined) {
+  if (!time) return "—";
+
   return time.slice(11, 16);
 }
 
@@ -959,7 +969,21 @@ if (updateUrl) {
                   </p>
                 </div>
               </div>
+<div className="mt-3 grid grid-cols-2 gap-3 sm:max-w-xl sm:gap-4">
+  <div className="rounded-xl bg-slate-950/30 p-4">
+    <p className="text-sm text-slate-300">🌅 Sunrise</p>
+    <p className="mt-1 text-2xl font-bold">
+      {formatSunTime(weather.sun?.sunrise)}
+    </p>
+  </div>
 
+  <div className="rounded-xl bg-slate-950/30 p-4">
+    <p className="text-sm text-slate-300">🌇 Sunset</p>
+    <p className="mt-1 text-2xl font-bold">
+      {formatSunTime(weather.sun?.sunset)}
+    </p>
+  </div>
+</div>
               <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-200">
                 {peakUvLevel.advice}
               </p>
