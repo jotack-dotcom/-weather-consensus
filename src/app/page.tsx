@@ -277,27 +277,40 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const savedFavorites = localStorage.getItem("howhot-favorites");
+  try {
+    const savedFavorites = localStorage.getItem("howhot-favorites");
+    const savedRecentSearches = localStorage.getItem(
+      "howhot-recent-searches"
+    );
 
-      if (savedFavorites) {
-        setFavorites(JSON.parse(savedFavorites));
-      }
-    } catch {
-      setFavorites([]);
-    } finally {
-      setFavoritesLoaded(true);
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites));
     }
-  }, []);
 
-  useEffect(() => {
-    if (!favoritesLoaded) return;
+    if (savedRecentSearches) {
+      setRecentSearches(JSON.parse(savedRecentSearches));
+    }
+  } catch {
+    setFavorites([]);
+    setRecentSearches([]);
+  } finally {
+    setFavoritesLoaded(true);
+  }
+}, []);
 
-    localStorage.setItem("howhot-favorites", JSON.stringify(favorites));
-  }, [favorites, favoritesLoaded]);
+useEffect(() => {
+  if (!favoritesLoaded) return;
+
+  localStorage.setItem("howhot-favorites", JSON.stringify(favorites));
+  localStorage.setItem(
+    "howhot-recent-searches",
+    JSON.stringify(recentSearches)
+  );
+}, [favorites, recentSearches, favoritesLoaded]);
 
   useEffect(() => {
     const query = searchCity.trim();
@@ -325,7 +338,22 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [searchCity, showSuggestions]);
 
-  async function loadWeather(city: string) {
+  function saveRecentSearch(city: string) {
+  const cleanCity = city.trim();
+
+  if (!cleanCity) return;
+
+  setRecentSearches((currentSearches) =>
+    [
+      cleanCity,
+      ...currentSearches.filter(
+        (search) => search.toLowerCase() !== cleanCity.toLowerCase()
+      ),
+    ].slice(0, 5)
+  );
+}
+
+  async function loadWeather(city: string, updateUrl = true) {
     setLoading(true);
     setError("");
 
@@ -341,6 +369,18 @@ export default function Home() {
       }
 
       setWeather(data);
+      saveRecentSearch(data.city);
+
+if (updateUrl) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("city", data.city);
+
+  window.history.replaceState(
+    {},
+    "",
+    `${url.pathname}?${url.searchParams.toString()}`
+  );
+}
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not load weather data."
@@ -349,6 +389,18 @@ export default function Home() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+  const cityFromUrl = new URLSearchParams(window.location.search).get("city");
+
+  if (!cityFromUrl) return;
+
+  setSearchCity(cityFromUrl);
+  setLocationMessage("");
+  void loadWeather(cityFromUrl, false);
+  // loadWeather is intentionally only called once when the page opens.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -647,6 +699,31 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {recentSearches.length > 0 && (
+  <section className="mt-4">
+    <p className="mb-2 text-sm font-semibold text-slate-400">
+      Recent searches
+    </p>
+
+    <div className="flex flex-wrap gap-2">
+      {recentSearches.map((recentCity) => (
+        <button
+          key={recentCity}
+          type="button"
+          onClick={() => {
+            setSearchCity(recentCity);
+            setLocationMessage("");
+            void loadWeather(recentCity);
+          }}
+          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-sky-400 hover:text-sky-300"
+        >
+          {recentCity}
+        </button>
+      ))}
+    </div>
+  </section>
+)}
 
         {locationMessage && (
           <p className="mt-3 text-sm text-slate-400">{locationMessage}</p>
