@@ -587,9 +587,12 @@ if (updateUrl) {
     >
       <div className="mx-auto max-w-6xl">
         <header className="mb-7 sm:mb-10">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
-            HowHot.today
-          </p>
+          <a
+  href="/"
+  className="mb-2 inline-block text-sm font-semibold uppercase tracking-[0.25em] text-sky-400 transition hover:text-sky-200"
+>
+  HowHot.today
+</a>
 
           <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
             Today&apos;s weather, with more confidence.
