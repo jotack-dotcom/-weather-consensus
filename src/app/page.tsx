@@ -20,6 +20,13 @@ type Hourly = {
   precipitation_probability?: Array<number | null>;
   wind_speed_10m?: Array<number | null>;
 };
+
+type UvData = {
+  time?: string[];
+  index?: Array<number | null>;
+  dailyMax?: Array<number | null>;
+};
+
 type ModelResult = {
   name: string;
   temperature: number | null;
@@ -33,7 +40,8 @@ type Consensus = Omit<ModelResult, "name">;
 
 type Weather = {
   currentTime?: string;
-hourly?: Hourly;
+  hourly?: Hourly;
+  uv?: UvData;
   city: string;
   country?: string;
   weatherCode?: number | null;
@@ -57,6 +65,18 @@ function formatNumber(value: number | null | undefined, decimals = 1) {
   }
 
   return value.toFixed(decimals);
+}
+
+function formatHour(time: string) {
+  return time.slice(11, 16);
+}
+
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${date}T12:00:00`));
 }
 
 function windDirectionToText(degrees: number | null | undefined) {
@@ -85,9 +105,11 @@ function weatherIcon(code: number | null | undefined) {
   if (code === 3) return "☁️";
   if (code === 45 || code === 48) return "🌫️";
   if ([51, 53, 55, 56, 57].includes(code ?? -1)) return "🌦️";
+
   if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code ?? -1)) {
     return "🌧️";
   }
+
   if ([71, 73, 75, 77, 85, 86].includes(code ?? -1)) return "❄️";
   if ([95, 96, 99].includes(code ?? -1)) return "⛈️";
 
@@ -118,21 +140,6 @@ function weatherDescription(code: number | null | undefined) {
   };
 
   return descriptions[code ?? -1] ?? "Weather forecast";
-}
-
-function formatDate(date: string) {
-  function formatHour(time: string) {
-  return time.slice(11, 16);
-}
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(`${date}T12:00:00`));
-}
-
-function formatHour(time: string) {
-  return time.slice(11, 16);
 }
 
 function getConfidence(models: ModelResult[]) {
@@ -185,6 +192,66 @@ function getConfidence(models: ModelResult[]) {
   };
 }
 
+function getUvLevel(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return {
+      label: "Unavailable",
+      color: "text-slate-300",
+      background: "bg-slate-800",
+      border: "border-slate-700",
+      advice: "UV data is unavailable for this location right now.",
+    };
+  }
+
+  if (value < 3) {
+    return {
+      label: "Low",
+      color: "text-emerald-300",
+      background: "bg-emerald-500/10",
+      border: "border-emerald-400/30",
+      advice: "Low risk for most people. Enjoy the day.",
+    };
+  }
+
+  if (value < 6) {
+    return {
+      label: "Moderate",
+      color: "text-yellow-300",
+      background: "bg-yellow-500/10",
+      border: "border-yellow-400/30",
+      advice: "Sun protection is recommended. Consider shade, sunglasses and SPF 30+.",
+    };
+  }
+
+  if (value < 8) {
+    return {
+      label: "High",
+      color: "text-orange-300",
+      background: "bg-orange-500/10",
+      border: "border-orange-400/30",
+      advice: "Protection is recommended. Limit direct sun around the peak and use SPF 30+.",
+    };
+  }
+
+  if (value < 11) {
+    return {
+      label: "Very high",
+      color: "text-red-300",
+      background: "bg-red-500/10",
+      border: "border-red-400/30",
+      advice: "Extra protection is recommended. Seek shade around the strongest hours.",
+    };
+  }
+
+  return {
+    label: "Extreme",
+    color: "text-fuchsia-300",
+    background: "bg-fuchsia-500/10",
+    border: "border-fuchsia-400/30",
+    advice: "Avoid prolonged direct sun. Seek shade and use strong sun protection.",
+  };
+}
+
 function AdPlaceholder({ location }: { location: string }) {
   return (
     <div className="my-6 flex min-h-20 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-4 text-center sm:my-8 sm:min-h-28 sm:px-6">
@@ -210,22 +277,27 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
 
-useEffect(() => {
-  try {
-    const savedFavorites = localStorage.getItem("howhot-favorites");
+  useEffect(() => {
+    try {
+      const savedFavorites = localStorage.getItem("howhot-favorites");
 
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
+      if (savedFavorites) {
+        setFavorites(JSON.parse(savedFavorites));
+      }
+    } catch {
+      setFavorites([]);
+    } finally {
+      setFavoritesLoaded(true);
     }
-  } catch {
-    setFavorites([]);
-  }
-}, []);
+  }, []);
 
-useEffect(() => {
-  localStorage.setItem("howhot-favorites", JSON.stringify(favorites));
-}, [favorites]);
+  useEffect(() => {
+    if (!favoritesLoaded) return;
+
+    localStorage.setItem("howhot-favorites", JSON.stringify(favorites));
+  }, [favorites, favoritesLoaded]);
 
   useEffect(() => {
     const query = searchCity.trim();
@@ -291,6 +363,30 @@ useEffect(() => {
     void loadWeather(city);
   }
 
+  function toggleFavorite(city: string) {
+    setFavorites((currentFavorites) => {
+      const alreadySaved = currentFavorites.some(
+        (favorite) => favorite.toLowerCase() === city.toLowerCase()
+      );
+
+      if (alreadySaved) {
+        return currentFavorites.filter(
+          (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+        );
+      }
+
+      return [...currentFavorites, city];
+    });
+  }
+
+  function removeFavorite(city: string) {
+    setFavorites((currentFavorites) =>
+      currentFavorites.filter(
+        (favorite) => favorite.toLowerCase() !== city.toLowerCase()
+      )
+    );
+  }
+
   function useMyLocation() {
     if (!navigator.geolocation) {
       setLocationMessage(
@@ -298,29 +394,6 @@ useEffect(() => {
       );
       return;
     }
-    function toggleFavorite(city: string) {
-  setFavorites((currentFavorites) => {
-    const alreadySaved = currentFavorites.some(
-      (favorite) => favorite.toLowerCase() === city.toLowerCase()
-    );
-
-    if (alreadySaved) {
-      return currentFavorites.filter(
-        (favorite) => favorite.toLowerCase() !== city.toLowerCase()
-      );
-    }
-
-    return [...currentFavorites, city];
-  });
-}
-
-function removeFavorite(city: string) {
-  setFavorites((currentFavorites) =>
-    currentFavorites.filter(
-      (favorite) => favorite.toLowerCase() !== city.toLowerCase()
-    )
-  );
-}
 
     setLocating(true);
     setLocationMessage("");
@@ -367,87 +440,99 @@ function removeFavorite(city: string) {
       }
     );
   }
-function toggleFavorite(city: string) {
-  setFavorites((currentFavorites) => {
-    const alreadySaved = currentFavorites.some(
-      (favorite) => favorite.toLowerCase() === city.toLowerCase()
-    );
-
-    if (alreadySaved) {
-      return currentFavorites.filter(
-        (favorite) => favorite.toLowerCase() !== city.toLowerCase()
-      );
-    }
-
-    return [...currentFavorites, city];
-  });
-}
-
-function removeFavorite(city: string) {
-  setFavorites((currentFavorites) =>
-    currentFavorites.filter(
-      (favorite) => favorite.toLowerCase() !== city.toLowerCase()
-    )
-  );
-}
 
   const models = Array.isArray(weather?.models) ? weather.models : [];
   const confidence = getConfidence(models);
 
   const daily = Array.isArray(weather?.forecast?.time)
-  ? weather.forecast.time.map((date, index) => ({
-      date,
-      weatherCode: weather.forecast?.weather_code?.[index],
-      temperatureMax: weather.forecast?.temperature_2m_max?.[index],
-      temperatureMin: weather.forecast?.temperature_2m_min?.[index],
-      precipitationProbability:
-        weather.forecast?.precipitation_probability_max?.[index],
-      precipitationSum: weather.forecast?.precipitation_sum?.[index],
-      windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
-      windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
-    }))
-  : [];
+    ? weather.forecast.time.map((date, index) => ({
+        date,
+        weatherCode: weather.forecast?.weather_code?.[index],
+        temperatureMax: weather.forecast?.temperature_2m_max?.[index],
+        temperatureMin: weather.forecast?.temperature_2m_min?.[index],
+        precipitationProbability:
+          weather.forecast?.precipitation_probability_max?.[index],
+        precipitationSum: weather.forecast?.precipitation_sum?.[index],
+        windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
+        windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
+      }))
+    : [];
 
-const currentHour = weather?.currentTime?.slice(0, 13);
+  const currentHour = weather?.currentTime?.slice(0, 13);
+  const currentDate = weather?.currentTime?.slice(0, 10);
 
-const nextHourIndex = currentHour
-  ? Math.max(
-      weather?.hourly?.time?.findIndex(
-        (time) => time.slice(0, 13) >= currentHour
-      ) ?? 0,
-      0
-    )
-  : 0;
+  const nextHourIndex = currentHour
+    ? Math.max(
+        weather?.hourly?.time?.findIndex(
+          (time) => time.slice(0, 13) >= currentHour
+        ) ?? 0,
+        0
+      )
+    : 0;
 
-const upcomingHours = Array.isArray(weather?.hourly?.time)
-  ? weather.hourly.time
-      .slice(nextHourIndex, nextHourIndex + 12)
-      .map((time, index) => {
-        const hourlyIndex = nextHourIndex + index;
+  const upcomingHours = Array.isArray(weather?.hourly?.time)
+    ? weather.hourly.time
+        .slice(nextHourIndex, nextHourIndex + 12)
+        .map((time, index) => {
+          const hourlyIndex = nextHourIndex + index;
 
-        return {
-          time,
-          weatherCode: weather.hourly?.weather_code?.[hourlyIndex],
-          temperature: weather.hourly?.temperature_2m?.[hourlyIndex],
-          rainChance:
-            weather.hourly?.precipitation_probability?.[hourlyIndex],
-          windSpeed: weather.hourly?.wind_speed_10m?.[hourlyIndex],
-        };
-      })
-  : [];
-const isCurrentCityFavorite = weather
-  ? favorites.some(
-      (favorite) => favorite.toLowerCase() === weather.city.toLowerCase()
-    )
-  : false;
+          return {
+            time,
+            weatherCode: weather.hourly?.weather_code?.[hourlyIndex],
+            temperature: weather.hourly?.temperature_2m?.[hourlyIndex],
+            rainChance:
+              weather.hourly?.precipitation_probability?.[hourlyIndex],
+            windSpeed: weather.hourly?.wind_speed_10m?.[hourlyIndex],
+          };
+        })
+    : [];
+
+  const currentUvIndex =
+    currentHour && Array.isArray(weather?.uv?.time)
+      ? weather.uv.time.findIndex((time) => time.slice(0, 13) === currentHour)
+      : -1;
+
+  const currentUv =
+    currentUvIndex >= 0 ? weather?.uv?.index?.[currentUvIndex] : null;
+
+  const uvHoursToday =
+    weather?.uv?.time
+      ?.map((time, index) => ({
+        time,
+        value: weather.uv?.index?.[index],
+      }))
+      .filter(
+        (hour): hour is { time: string; value: number } =>
+          timeIsToday(hour.time, currentDate) &&
+          typeof hour.value === "number" &&
+          Number.isFinite(hour.value)
+      ) ?? [];
+
+  const peakUvHour =
+    uvHoursToday.length > 0
+      ? uvHoursToday.reduce((highest, hour) =>
+          hour.value > highest.value ? hour : highest
+        )
+      : null;
+
+  const peakUv = peakUvHour?.value ?? weather?.uv?.dailyMax?.[0] ?? null;
+  const currentUvLevel = getUvLevel(currentUv);
+  const peakUvLevel = getUvLevel(peakUv);
+
+  const isCurrentCityFavorite = weather
+    ? favorites.some(
+        (favorite) => favorite.toLowerCase() === weather.city.toLowerCase()
+      )
+    : false;
+
   return (
     <main
-  className="min-h-screen px-4 py-6 text-white sm:px-8 sm:py-10"
-  style={{
-    backgroundImage:
-      "radial-gradient(circle at 86% 12%, rgba(56, 189, 248, 0.22), transparent 28%), radial-gradient(circle at 12% 92%, rgba(251, 146, 60, 0.12), transparent 26%), linear-gradient(145deg, #020617 0%, #08264a 48%, #020617 100%)",
-  }}
->
+      className="min-h-screen px-4 py-6 text-white sm:px-8 sm:py-10"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 86% 12%, rgba(56, 189, 248, 0.22), transparent 28%), radial-gradient(circle at 12% 92%, rgba(251, 146, 60, 0.12), transparent 26%), linear-gradient(145deg, #020617 0%, #08264a 48%, #020617 100%)",
+      }}
+    >
       <div className="mx-auto max-w-6xl">
         <header className="mb-7 sm:mb-10">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
@@ -462,6 +547,7 @@ const isCurrentCityFavorite = weather
             Compare multiple weather models to get a clearer forecast.
           </p>
         </header>
+
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-3 sm:flex-row"
@@ -523,43 +609,44 @@ const isCurrentCityFavorite = weather
         >
           {locating ? "Getting your location..." : "Use my location"}
         </button>
+
         {favorites.length > 0 && (
-  <section className="mt-4">
-    <p className="mb-2 text-sm font-semibold text-slate-400">
-      Favorite cities
-    </p>
+          <section className="mt-4">
+            <p className="mb-2 text-sm font-semibold text-slate-400">
+              Favorite cities
+            </p>
 
-    <div className="flex flex-wrap gap-2">
-      {favorites.map((favorite) => (
-        <div
-          key={favorite}
-          className="flex overflow-hidden rounded-lg border border-slate-700 bg-slate-900"
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setSearchCity(favorite);
-              setLocationMessage("");
-              void loadWeather(favorite);
-            }}
-            className="px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-800"
-          >
-            {favorite}
-          </button>
+            <div className="flex flex-wrap gap-2">
+              {favorites.map((favorite) => (
+                <div
+                  key={favorite}
+                  className="flex overflow-hidden rounded-lg border border-slate-700 bg-slate-900"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchCity(favorite);
+                      setLocationMessage("");
+                      void loadWeather(favorite);
+                    }}
+                    className="px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-800"
+                  >
+                    {favorite}
+                  </button>
 
-          <button
-            type="button"
-            onClick={() => removeFavorite(favorite)}
-            aria-label={`Remove ${favorite} from favorites`}
-            className="border-l border-slate-700 px-3 py-2 text-slate-400 transition hover:bg-red-500/20 hover:text-red-300"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
-  </section>
-)}
+                  <button
+                    type="button"
+                    onClick={() => removeFavorite(favorite)}
+                    aria-label={`Remove ${favorite} from favorites`}
+                    className="border-l border-slate-700 px-3 py-2 text-slate-400 transition hover:bg-red-500/20 hover:text-red-300"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {locationMessage && (
           <p className="mt-3 text-sm text-slate-400">{locationMessage}</p>
@@ -570,9 +657,11 @@ const isCurrentCityFavorite = weather
             <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
               Your weather
             </p>
+
             <h2 className="mt-2 text-2xl font-bold">
               Find a forecast for anywhere in the world.
             </h2>
+
             <p className="mt-3 max-w-2xl text-slate-300">
               Search for a city above, or use your current location to see a
               Weather Consensus from multiple models.
@@ -608,6 +697,7 @@ const isCurrentCityFavorite = weather
 
                     <div>
                       <h2 className="text-3xl font-bold">{weather.city}</h2>
+
                       {weather.country && (
                         <p className="text-slate-400">{weather.country}</p>
                       )}
@@ -619,15 +709,19 @@ const isCurrentCityFavorite = weather
                   Consensus from ECMWF, NOAA and DWD
                 </p>
               </div>
-{weather.city !== "Your location" && (
-  <button
-    type="button"
-    onClick={() => toggleFavorite(weather.city)}
-    className="mb-4 rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/20"
-  >
-    {isCurrentCityFavorite ? "★ Saved as favorite" : "☆ Save as favorite"}
-  </button>
-)}
+
+              {weather.city !== "Your location" && (
+                <button
+                  type="button"
+                  onClick={() => toggleFavorite(weather.city)}
+                  className="mb-4 rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/20"
+                >
+                  {isCurrentCityFavorite
+                    ? "★ Saved as favorite"
+                    : "☆ Save as favorite"}
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
                 <div className="rounded-xl bg-slate-800/70 p-3 sm:p-4">
                   <p className="text-xs text-slate-400 sm:text-sm">
@@ -680,42 +774,101 @@ const isCurrentCityFavorite = weather
                 </div>
               </div>
             </section>
-<section className="mt-7 sm:mt-8">
-  <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
-    Hourly forecast
-  </p>
 
-  <h2 className="mb-4 text-2xl font-bold">The next 12 hours</h2>
+            
 
-  <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
-    {upcomingHours.map((hour) => (
-      <article
-        key={hour.time}
-        className="w-32 shrink-0 snap-start rounded-xl border border-slate-800 bg-slate-900 p-3"
-      >
-        <p className="text-sm font-semibold text-slate-300">
-          {formatHour(hour.time)}
-        </p>
+            <section className="mt-7 sm:mt-8">
+              <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+                Hourly forecast
+              </p>
 
-        <span className="mt-3 block text-3xl" aria-hidden="true">
-          {weatherIcon(hour.weatherCode)}
-        </span>
+              <h2 className="mb-4 text-2xl font-bold">The next 12 hours</h2>
 
-        <p className="mt-3 text-xl font-bold">
-          {formatNumber(hour.temperature, 0)}°
-        </p>
+              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
+                {upcomingHours.map((hour) => (
+                  <article
+                    key={hour.time}
+                    className="w-32 shrink-0 snap-start rounded-xl border border-slate-800 bg-slate-900 p-3"
+                  >
+                    <p className="text-sm font-semibold text-slate-300">
+                      {formatHour(hour.time)}
+                    </p>
 
-        <p className="mt-2 text-xs text-slate-400">
-          Rain: {formatNumber(hour.rainChance, 0)}%
-        </p>
+                    <span className="mt-3 block text-3xl" aria-hidden="true">
+                      {weatherIcon(hour.weatherCode)}
+                    </span>
 
-        <p className="mt-1 text-xs text-slate-400">
-          Wind: {formatNumber(hour.windSpeed, 1)} m/s
-        </p>
-      </article>
-    ))}
-  </div>
-</section>
+                    <p className="mt-3 text-xl font-bold">
+                      {formatNumber(hour.temperature, 0)}°
+                    </p>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Rain: {formatNumber(hour.rainChance, 0)}%
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      Wind: {formatNumber(hour.windSpeed, 1)} m/s
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section
+              className={`mt-7 rounded-2xl border p-5 sm:mt-8 sm:p-6 ${peakUvLevel.background} ${peakUvLevel.border}`}
+            >
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-sky-300">
+                    UV forecast
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-bold">
+                    ☀️ Sun safety today
+                  </h2>
+                </div>
+
+                <p
+                  className={`rounded-full bg-slate-950/30 px-3 py-1 text-sm font-bold ${peakUvLevel.color}`}
+                >
+                  {peakUvLevel.label}
+                </p>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-xl sm:gap-4">
+                <div className="rounded-xl bg-slate-950/30 p-4">
+                  <p className="text-sm text-slate-300">UV now</p>
+                  <p className="mt-1 text-3xl font-bold">
+                    {formatNumber(currentUv, 1)}
+                  </p>
+                  <p className={`mt-1 text-sm font-semibold ${currentUvLevel.color}`}>
+                    {currentUvLevel.label}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-950/30 p-4">
+                  <p className="text-sm text-slate-300">Peak today</p>
+                  <p className="mt-1 text-3xl font-bold">
+                    {formatNumber(peakUv, 1)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    {peakUvHour
+                      ? `Strongest around ${formatHour(peakUvHour.time)}`
+                      : "Peak time unavailable"}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-200">
+                {peakUvLevel.advice}
+              </p>
+
+              <p className="mt-3 text-xs text-slate-400">
+                General guidance only. Individual needs vary, for example by
+                skin type and medication.
+              </p>
+            </section>
+
             <section className="mt-7 sm:mt-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 7-day consensus
@@ -855,4 +1008,8 @@ const isCurrentCityFavorite = weather
       </footer>
     </main>
   );
+}
+
+function timeIsToday(time: string, currentDate: string | undefined) {
+  return Boolean(currentDate && time.startsWith(currentDate));
 }
