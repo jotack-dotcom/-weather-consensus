@@ -445,7 +445,7 @@ const isCurrentCityFavorite = weather
   className="min-h-screen bg-slate-950 bg-cover bg-center bg-no-repeat bg-scroll px-4 py-6 text-white sm:bg-fixed sm:px-8 sm:py-10"
   style={{
     backgroundImage:
-      "linear-gradient(180deg, rgba(2, 6, 23, 0.42) 0%, rgba(2, 6, 23, 0.7) 48%, rgba(2, 6, 23, 0.94) 100%), url('/weather-sky.png')",
+  "linear-gradient(180deg, rgba(2, 6, 23, 0.18) 0%, rgba(2, 6, 23, 0.38) 48%, rgba(2, 6, 23, 0.72) 100%), url('/weather-sky.png')",
   }}
 >
       <div className="mx-auto max-w-6xl">
