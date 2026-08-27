@@ -539,6 +539,7 @@ if (updateUrl) {
         precipitationSum: weather.forecast?.precipitation_sum?.[index],
         windSpeedMax: weather.forecast?.wind_speed_10m_max?.[index],
         windGustsMax: weather.forecast?.wind_gusts_10m_max?.[index],
+        uvMax: weather.uv?.dailyMax?.[index],
       }))
     : [];
 
@@ -736,9 +737,19 @@ if (updateUrl) {
 
         {recentSearches.length > 0 && (
   <section className="mt-4">
-    <p className="mb-2 text-sm font-semibold text-slate-400">
-      Recent searches
-    </p>
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <p className="text-sm font-semibold text-slate-400">
+        Recent searches
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setRecentSearches([])}
+        className="text-xs font-semibold text-slate-400 transition hover:text-sky-300"
+      >
+        Clear
+      </button>
+    </div>
 
     <div className="flex flex-wrap gap-2">
       {recentSearches.map((recentCity) => (
@@ -1026,7 +1037,9 @@ if (updateUrl) {
                         {formatNumber(day.temperatureMin, 0)}°
                       </span>
                     </p>
-
+<p className="mt-3 text-xs font-semibold text-sky-300 sm:mt-4 sm:text-sm">
+  UV: {formatNumber(day.uvMax, 1)} · {getUvLevel(day.uvMax).label}
+</p>
                     <div className="mt-3 space-y-1 text-xs text-slate-300 sm:mt-4 sm:text-sm">
                       <p>
                         Rain: {formatNumber(day.precipitationProbability, 0)}%
