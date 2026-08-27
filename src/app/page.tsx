@@ -141,7 +141,29 @@ function weatherDescription(code: number | null | undefined) {
 
   return descriptions[code ?? -1] ?? "Weather forecast";
 }
+function weatherBackground(code: number | null | undefined) {
+  if (code === 0 || code === 1) {
+    return "radial-gradient(circle at 85% 12%, rgba(251, 191, 36, 0.24), transparent 26%), radial-gradient(circle at 12% 92%, rgba(56, 189, 248, 0.16), transparent 28%), linear-gradient(145deg, #06285a 0%, #0b4d82 48%, #06152f 100%)";
+  }
 
+  if (code === 2 || code === 3 || code === 45 || code === 48) {
+    return "radial-gradient(circle at 84% 10%, rgba(148, 163, 184, 0.16), transparent 28%), linear-gradient(145deg, #0b1d3a 0%, #1e3a56 50%, #071225 100%)";
+  }
+
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code ?? -1)) {
+    return "radial-gradient(circle at 12% 88%, rgba(14, 165, 233, 0.16), transparent 28%), radial-gradient(circle at 88% 16%, rgba(71, 85, 105, 0.2), transparent 30%), linear-gradient(145deg, #061a38 0%, #123b60 52%, #061126 100%)";
+  }
+
+  if ([71, 73, 75, 77, 85, 86].includes(code ?? -1)) {
+    return "radial-gradient(circle at 84% 12%, rgba(186, 230, 253, 0.18), transparent 30%), linear-gradient(145deg, #10294a 0%, #315978 50%, #0b1d36 100%)";
+  }
+
+  if ([95, 96, 99].includes(code ?? -1)) {
+    return "radial-gradient(circle at 82% 14%, rgba(167, 139, 250, 0.2), transparent 28%), radial-gradient(circle at 16% 88%, rgba(59, 130, 246, 0.15), transparent 30%), linear-gradient(145deg, #150d35 0%, #20224e 50%, #070b22 100%)";
+  }
+
+  return "radial-gradient(circle at 86% 12%, rgba(56, 189, 248, 0.22), transparent 28%), radial-gradient(circle at 12% 92%, rgba(251, 146, 60, 0.12), transparent 26%), linear-gradient(145deg, #020617 0%, #08264a 48%, #020617 100%)";
+}
 function getConfidence(models: ModelResult[]) {
   const temperatures = models
     .map((model) => model.temperature)
@@ -581,9 +603,8 @@ if (updateUrl) {
     <main
       className="min-h-screen px-4 py-6 text-white sm:px-8 sm:py-10"
       style={{
-        backgroundImage:
-          "radial-gradient(circle at 86% 12%, rgba(56, 189, 248, 0.22), transparent 28%), radial-gradient(circle at 12% 92%, rgba(251, 146, 60, 0.12), transparent 26%), linear-gradient(145deg, #020617 0%, #08264a 48%, #020617 100%)",
-      }}
+  backgroundImage: weatherBackground(weather?.weatherCode),
+}}
     >
       <div className="mx-auto max-w-6xl">
         <header className="mb-7 sm:mb-10">
