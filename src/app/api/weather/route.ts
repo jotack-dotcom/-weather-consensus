@@ -104,7 +104,7 @@ export async function GET(request: Request) {
       `&longitude=${longitude}` +
       `&hourly=weather_code,temperature_2m,precipitation_probability,wind_speed_10m,uv_index` +
       `&current=weather_code,temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset` +
       `&forecast_days=7` +
       `&wind_speed_unit=ms` +
       `&timezone=auto`;
@@ -296,6 +296,10 @@ export async function GET(request: Request) {
         index: weatherData.hourly.uv_index,
         dailyMax: weatherData.daily.uv_index_max,
       },
+      sun: {
+  sunrise: weatherData.daily.sunrise?.[0] ?? null,
+  sunset: weatherData.daily.sunset?.[0] ?? null,
+},
       models,
       consensus,
     });
