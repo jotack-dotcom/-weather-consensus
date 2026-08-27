@@ -1037,9 +1037,14 @@ if (updateUrl) {
                         {formatNumber(day.temperatureMin, 0)}°
                       </span>
                     </p>
-<p className="mt-3 text-xs font-semibold text-sky-300 sm:mt-4 sm:text-sm">
-  UV: {formatNumber(day.uvMax, 1)} · {getUvLevel(day.uvMax).label}
-</p>
+<div className="mt-3 flex min-h-7 items-center sm:mt-4">
+  <span
+    title={`UV ${formatNumber(day.uvMax, 1)}: ${getUvLevel(day.uvMax).label}`}
+    className="rounded-full bg-sky-400/10 px-2 py-1 text-xs font-bold text-sky-300"
+  >
+    UV {formatNumber(day.uvMax, 1)}
+  </span>
+</div>
                     <div className="mt-3 space-y-1 text-xs text-slate-300 sm:mt-4 sm:text-sm">
                       <p>
                         Rain: {formatNumber(day.precipitationProbability, 0)}%
