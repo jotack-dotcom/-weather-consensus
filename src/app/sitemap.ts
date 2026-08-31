@@ -32,6 +32,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.8,
     },
+        {
+      url: "https://www.howhot.today/weather/new-york",
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
+    {
+      url: "https://www.howhot.today/weather/los-angeles",
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
+    {
+      url: "https://www.howhot.today/weather/chicago",
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
     {
       url: "https://www.howhot.today/privacy",
       changeFrequency: "monthly",

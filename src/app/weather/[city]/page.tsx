@@ -72,6 +72,30 @@ const cities: City[] = [
     description:
       "Check today’s weather, UV index, sunrise and sunset times for Luleå.",
   },
+    {
+    slug: "new-york",
+    name: "New York",
+    latitude: 40.7128,
+    longitude: -74.006,
+    description:
+      "Check today’s weather, UV index, sunrise and sunset times for New York.",
+  },
+  {
+    slug: "los-angeles",
+    name: "Los Angeles",
+    latitude: 34.0522,
+    longitude: -118.2437,
+    description:
+      "Check today’s weather, UV index, sunrise and sunset times for Los Angeles.",
+  },
+  {
+    slug: "chicago",
+    name: "Chicago",
+    latitude: 41.8781,
+    longitude: -87.6298,
+    description:
+      "Check today’s weather, UV index, sunrise and sunset times for Chicago.",
+  },
 ];
 
 export const revalidate = 1800;
