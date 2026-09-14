@@ -300,6 +300,9 @@ function AdPlaceholder({ location }: { location: string }) {
 }
 
 export default function Home() {
+  const [selectedForecastDate, setSelectedForecastDate] = useState<string | null>(
+  null
+);
   const [searchCity, setSearchCity] = useState("");
   const [weather, setWeather] = useState<Weather | null>(null);
   const [loading, setLoading] = useState(false);
@@ -571,6 +574,24 @@ if (updateUrl) {
           };
         })
     : [];
+
+      const selectedForecastDay = daily.find(
+    (day) => day.date === selectedForecastDate
+  );
+
+  const selectedDayHours =
+    selectedForecastDate && Array.isArray(weather?.hourly?.time)
+      ? weather.hourly.time
+          .map((time, index) => ({
+            time,
+            weatherCode: weather.hourly?.weather_code?.[index],
+            temperature: weather.hourly?.temperature_2m?.[index],
+            rainChance:
+              weather.hourly?.precipitation_probability?.[index],
+            windSpeed: weather.hourly?.wind_speed_10m?.[index],
+          }))
+          .filter((hour) => hour.time.startsWith(selectedForecastDate))
+      : [];
 
   const currentUvIndex =
     currentHour && Array.isArray(weather?.uv?.time)
@@ -1005,57 +1026,153 @@ if (updateUrl) {
               </p>
             </section>
 
-            <section className="mt-7 sm:mt-8">
+                        <section className="mt-7 sm:mt-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
                 7-day consensus
               </p>
 
-              <h2 className="mb-4 text-2xl font-bold">
-                Forecast from multiple models
-              </h2>
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <h2 className="text-2xl font-bold">
+                  Forecast from multiple models
+                </h2>
+
+                <p className="text-sm text-slate-400">
+                  Select a day for an hourly forecast
+                </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-7">
-                {daily.map((day, index) => (
-                  <article
-                    key={day.date}
-                    className="rounded-xl border border-slate-800 bg-slate-900 p-3 sm:rounded-2xl sm:p-4"
-                  >
-                    <p className="text-sm font-semibold sm:text-base">
-                      {index === 0 ? "Today" : formatDate(day.date)}
-                    </p>
+                {daily.map((day, index) => {
+                  const isSelected = selectedForecastDate === day.date;
 
-                    <div className="mt-3 flex min-h-10 items-center gap-1 text-xs leading-4 text-slate-400 sm:mt-4 sm:min-h-12 sm:gap-2 sm:text-sm">
-                      <span className="text-2xl sm:text-3xl" aria-hidden="true">
-                        {weatherIcon(day.weatherCode)}
-                      </span>
-                      <span>{weatherDescription(day.weatherCode)}</span>
-                    </div>
-
-                    <p className="mt-3 text-lg font-bold sm:mt-4 sm:text-xl">
-                      {formatNumber(day.temperatureMax, 0)}°
-                      <span className="ml-1 text-sm font-normal text-slate-400 sm:ml-2 sm:text-base">
-                        {formatNumber(day.temperatureMin, 0)}°
-                      </span>
-                    </p>
-<div className="mt-3 flex min-h-7 items-center sm:mt-4">
-  <span
-    title={`UV ${formatNumber(day.uvMax, 1)}: ${getUvLevel(day.uvMax).label}`}
-    className="rounded-full bg-sky-400/10 px-2 py-1 text-xs font-bold text-sky-300"
-  >
-    UV {formatNumber(day.uvMax, 1)}
-  </span>
-</div>
-                    <div className="mt-3 space-y-1 text-xs text-slate-300 sm:mt-4 sm:text-sm">
-                      <p>
-                        Rain: {formatNumber(day.precipitationProbability, 0)}%
+                  return (
+                    <button
+                      key={day.date}
+                      type="button"
+                      onClick={() =>
+                        setSelectedForecastDate((currentDate) =>
+                          currentDate === day.date ? null : day.date
+                        )
+                      }
+                      aria-pressed={isSelected}
+                      className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                        isSelected
+                          ? "border-sky-400 bg-slate-800 shadow-lg shadow-sky-950/40"
+                          : "border-slate-800 bg-slate-900 hover:border-sky-400/60 hover:bg-slate-800"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold sm:text-base">
+                        {index === 0 ? "Today" : formatDate(day.date)}
                       </p>
-                      <p>{formatNumber(day.precipitationSum, 1)} mm</p>
-                      <p>Wind: {formatNumber(day.windSpeedMax, 1)} m/s</p>
-                      <p>Gusts: {formatNumber(day.windGustsMax, 1)} m/s</p>
-                    </div>
-                  </article>
-                ))}
+
+                      <div className="mt-3 flex min-h-10 items-center gap-1 text-xs leading-4 text-slate-400 sm:mt-4 sm:min-h-12 sm:gap-2 sm:text-sm">
+                        <span
+                          className="text-2xl sm:text-3xl"
+                          aria-hidden="true"
+                        >
+                          {weatherIcon(day.weatherCode)}
+                        </span>
+
+                        <span>{weatherDescription(day.weatherCode)}</span>
+                      </div>
+
+                      <p className="mt-3 text-lg font-bold sm:mt-4 sm:text-xl">
+                        {formatNumber(day.temperatureMax, 0)}°
+                        <span className="ml-1 text-sm font-normal text-slate-400 sm:ml-2 sm:text-base">
+                          {formatNumber(day.temperatureMin, 0)}°
+                        </span>
+                      </p>
+
+                      <div className="mt-3 flex min-h-7 items-center sm:mt-4">
+                        <span
+                          title={`UV ${formatNumber(day.uvMax, 1)}: ${
+                            getUvLevel(day.uvMax).label
+                          }`}
+                          className="rounded-full bg-sky-400/10 px-2 py-1 text-xs font-bold text-sky-300"
+                        >
+                          UV {formatNumber(day.uvMax, 1)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 space-y-1 text-xs text-slate-300 sm:mt-4 sm:text-sm">
+                        <p>
+                          Rain:{" "}
+                          {formatNumber(day.precipitationProbability, 0)}%
+                        </p>
+                        <p>{formatNumber(day.precipitationSum, 1)} mm</p>
+                        <p>Wind: {formatNumber(day.windSpeedMax, 1)} m/s</p>
+                        <p>Gusts: {formatNumber(day.windGustsMax, 1)} m/s</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
+              {selectedForecastDate && (
+                <div
+                  className="mt-5 rounded-2xl border border-sky-400/30 bg-slate-950/50 p-4 sm:mt-6 sm:p-6"
+                  id="selected-day-forecast"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-wider text-sky-400">
+                        Hour by hour
+                      </p>
+                      <h3 className="mt-1 text-xl font-bold sm:text-2xl">
+                        {selectedForecastDay
+                          ? formatDate(selectedForecastDay.date)
+                          : "Selected day"}
+                      </h3>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedForecastDate(null)}
+                      className="mt-2 text-left text-sm font-semibold text-slate-400 transition hover:text-sky-300 sm:mt-0"
+                    >
+                      Close ×
+                    </button>
+                  </div>
+
+                  {selectedDayHours.length > 0 ? (
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                      {selectedDayHours.map((hour) => (
+                        <article
+                          key={hour.time}
+                          className="rounded-xl border border-slate-800 bg-slate-900 p-3"
+                        >
+                          <p className="text-sm font-semibold text-slate-300">
+                            {formatHour(hour.time)}
+                          </p>
+
+                          <span
+                            className="mt-3 block text-3xl"
+                            aria-hidden="true"
+                          >
+                            {weatherIcon(hour.weatherCode)}
+                          </span>
+
+                          <p className="mt-2 text-xl font-bold">
+                            {formatNumber(hour.temperature, 0)}°
+                          </p>
+
+                          <p className="mt-2 text-xs text-slate-400">
+                            Rain: {formatNumber(hour.rainChance, 0)}%
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            Wind: {formatNumber(hour.windSpeed, 1)} m/s
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-5 text-sm text-slate-400">
+                      Hourly data is unavailable for this day.
+                    </p>
+                  )}
+                </div>
+              )}
             </section>
 
             <AdPlaceholder location="Below 7-day forecast" />
